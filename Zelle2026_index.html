@@ -498,6 +498,47 @@
     /* ── Balance chart ───────────────────────────────────────── */
     .balance-timeline canvas{max-height:170px}
 
+    /* ── Fix: Dashboard recent-tbody (5 cols, sin acciones)     */
+    #recent-tbody tr td:last-child{
+      position:static!important;
+      display:block!important;width:100%;
+      font-size:1rem;font-weight:800;margin-top:6px;
+    }
+
+    /* ── Fix: Balance-tbody (cols: mes / inc / exp / net / cum) */
+    #balance-tbody tr td:nth-child(1){
+      position:static!important;
+      display:block!important;width:100%;
+      font-size:.82rem;font-weight:700;color:var(--text2);
+      background:transparent!important;padding:0!important;
+      border-radius:0!important;margin-bottom:6px;
+    }
+    #balance-tbody tr td:nth-child(2){
+      display:inline-block!important;
+      font-size:.78rem;font-weight:600;
+      padding:2px 7px;border-radius:99px;
+      background:rgba(34,197,94,.13)!important;
+    }
+    #balance-tbody tr td:nth-child(3){
+      display:inline-block!important;
+      font-size:.78rem;font-weight:600;
+      padding:2px 7px;border-radius:99px;
+      background:rgba(239,68,68,.13)!important;
+      margin-left:4px;
+    }
+    #balance-tbody tr td:nth-child(4){
+      display:block!important;width:100%;
+      font-size:.92rem;font-weight:800;
+      margin-top:6px;
+    }
+    #balance-tbody tr td:nth-child(5),
+    #balance-tbody tr td:last-child{
+      position:static!important;
+      display:block!important;width:100%;
+      font-size:.75rem;font-weight:600;
+      color:var(--text2);margin-top:3px;
+    }
+
     /* ── Toast ───────────────────────────────────────────────── */
     #toast{
       bottom:calc(72px + env(safe-area-inset-bottom));
