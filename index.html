@@ -721,8 +721,6 @@
   </div>
   <nav>
     <a class="active" data-view="view-dashboard" onclick="switchView(this)"><span class="ico">📊</span> Dashboard</a>
-    <a data-view="view-monthly" onclick="switchView(this)"><span class="ico">📅</span> Por Mes</a>
-    <a data-view="view-history" onclick="switchView(this)"><span class="ico">📋</span> Historial</a>
     <a data-view="view-deudas" onclick="switchView(this)"><span class="ico">💳</span> Deudas</a>
     <a data-view="view-home" onclick="switchView(this)"><span class="ico">🏠</span> Home Billings</a>
     <!-- Menús personalizados — inyectados dinámicamente por JS -->
@@ -764,17 +762,6 @@
 
     <!-- ===== DASHBOARD ===== -->
     <div id="view-dashboard" class="view active">
-      <div class="cards" id="dash-cards"></div>
-      <div class="charts">
-        <div class="chart-box"><h3>Ingresos vs Gastos por mes</h3><canvas id="chart-monthly"></canvas></div>
-        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="chart-cat"></canvas></div>
-      </div>
-      <div class="tbl-wrap">
-        <div class="tbl-header"><h3>Últimas transacciones</h3></div>
-        <div class="tbl-scroll"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Descripción</th><th>Tipo</th><th>Categoría</th></tr></thead>
-        <tbody id="recent-tbody"></tbody></table></div>
-      </div>
-      <!-- Stats de menús personalizados -->
       <div id="dash-custom-menus"></div>
     </div>
 
@@ -1309,12 +1296,6 @@
   <a class="active" data-view="view-dashboard" onclick="switchView(this)">
     <span class="bn-ico">📊</span>Dashboard
   </a>
-  <a data-view="view-monthly" onclick="switchView(this)">
-    <span class="bn-ico">📅</span>Por Mes
-  </a>
-  <a data-view="view-history" onclick="switchView(this)">
-    <span class="bn-ico">📋</span>Historial
-  </a>
   <a data-view="view-deudas" onclick="switchView(this)">
     <span class="bn-ico">💳</span>Deudas
   </a>
@@ -1738,33 +1719,6 @@ function renderAll() {
 // DASHBOARD
 // ============================================================
 function renderDash() {
-  const inc = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-  const exp = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-  const net = inc - exp;
-  const now = new Date(); const cm = String(now.getMonth()+1).padStart(2,'0');
-  const mtxs = txs.filter(t=>txMonth(t)===cm);
-  const {inc:mi,exp:me,net:mn} = monthSummary(mtxs);
-
-  document.getElementById('dash-cards').innerHTML = `
-    <div class="card green"><div class="label">Total Ingresos</div><div class="value">${fmt(inc)}</div><div class="sub">Todo el año</div></div>
-    <div class="card red"><div class="label">Total Gastos</div><div class="value">${fmt(exp)}</div><div class="sub">Todo el año</div></div>
-    <div class="card yellow"><div class="label">Este Mes</div><div class="value">${fmtSigned(mn)}</div><div class="sub">${monthName(cm)}: ${fmt(mi)} in / ${fmt(me)} out</div></div>
-  `;
-
-  // Recent
-  const recent = [...txs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
-  document.getElementById('recent-tbody').innerHTML = recent.map(t=>`
-    <tr>
-      <td>${t.date}</td>
-      <td class="amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</td>
-      <td>${t.description}</td>
-      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
-      <td>${catLabel(t.category)}</td>
-    </tr>
-  `).join('');
-
-  renderChartMonthly();
-  renderChartCat();
   renderDashCustomMenus();
 }
 
@@ -1827,15 +1781,10 @@ function renderChartCat() {
   });
 }
 
-// ── Dashboard: stats de menús personalizados ────────────────────
+// ── Dashboard: Vista general ─────────────────────────────────────
 function renderDashCustomMenus() {
   const wrap = document.getElementById('dash-custom-menus');
   if (!wrap) return;
-
-  if (!customMenus || !customMenus.length) {
-    wrap.innerHTML = '';
-    return;
-  }
 
   // Destruir charts previas
   Object.keys(_cmDashCharts).forEach(k => {
@@ -1843,121 +1792,101 @@ function renderDashCustomMenus() {
     delete _cmDashCharts[k];
   });
 
-  const PIE_OPTS = (position) => ({
+  const PIE_OPTS = () => ({
     responsive: true,
     plugins: {
-      legend: {
-        position: position || 'bottom',
-        labels: { color:'#94a3b8', font:{size:9}, padding:6, boxWidth:10 }
-      },
-      tooltip: {
-        callbacks: {
-          label: ctx => ' ' + ctx.label + ': ' + ctx.raw.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})
-        }
-      }
+      legend: { position:'bottom', labels:{ color:'#94a3b8', font:{size:9}, padding:6, boxWidth:10 } },
+      tooltip: { callbacks: { label: ctx => ' '+ctx.label+': '+ctx.raw.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2}) } }
     }
   });
 
-  const cardsHTML = customMenus.map(m => {
-    const data = m.data || [];
-    const curr = m.currency || '';
-    const fmt2 = v => curr + (v||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
-
+  // Helper: genera HTML de una card
+  function buildCard(id, icon, name, curr, data) {
+    const fmtC = v => curr + (v||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
     const totalInc = data.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
     const totalExp = data.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
     const net = totalInc - totalExp;
     const netClass = net >= 0 ? 'net-pos' : 'net-neg';
-    const netStr = (net>=0?'+':'') + fmt2(Math.abs(net));
-    const count = data.length;
-
+    const netStr = (net>=0?'+':'') + fmtC(Math.abs(net));
+    const charts = data.length === 0
+      ? `<div class="dcm-empty">Sin registros aún</div>`
+      : `<div class="dcm-charts">
+           <div class="dcm-chart-wrap">
+             <div class="dcm-chart-lbl">💚 Ingresos por cat.</div>
+             <canvas id="dcm-chart-inc-${id}"></canvas>
+           </div>
+           <div class="dcm-chart-wrap">
+             <div class="dcm-chart-lbl">🔴 Gastos por cat.</div>
+             <canvas id="dcm-chart-exp-${id}"></canvas>
+           </div>
+         </div>`;
     return `
     <div class="dcm-card">
       <div class="dcm-card-head">
-        <div class="dcm-card-icon">${m.icon||'📂'}</div>
-        <div class="dcm-card-name">${m.name}</div>
-        <span class="dcm-card-curr">${curr}</span>
+        <div class="dcm-card-icon">${icon}</div>
+        <div class="dcm-card-name">${name}</div>
+        <span class="dcm-card-curr">${curr.trim()}</span>
       </div>
       <div class="dcm-stats">
-        <div class="dcm-stat"><div class="lbl">Ingresos</div><div class="val income">${fmt2(totalInc)}</div></div>
-        <div class="dcm-stat"><div class="lbl">Gastos</div><div class="val expense">${fmt2(totalExp)}</div></div>
+        <div class="dcm-stat"><div class="lbl">Ingresos</div><div class="val income">${fmtC(totalInc)}</div></div>
+        <div class="dcm-stat"><div class="lbl">Gastos</div><div class="val expense">${fmtC(totalExp)}</div></div>
         <div class="dcm-stat"><div class="lbl">Balance</div><div class="val ${netClass}">${netStr}</div></div>
       </div>
-      ${count === 0
-        ? `<div class="dcm-empty">Sin registros aún</div>`
-        : `<div class="dcm-charts">
-            <div class="dcm-chart-wrap">
-              <div class="dcm-chart-lbl">💚 Ingresos por cat.</div>
-              <canvas id="dcm-chart-inc-${m.id}"></canvas>
-            </div>
-            <div class="dcm-chart-wrap">
-              <div class="dcm-chart-lbl">🔴 Gastos por cat.</div>
-              <canvas id="dcm-chart-exp-${m.id}"></canvas>
-            </div>
-           </div>`
-      }
+      ${charts}
     </div>`;
-  }).join('');
+  }
+
+  // Card Home Billings
+  const homeCard = buildCard('home', '🏠', 'Home Billings', HOME_CURR.trim(), homeTxs);
+
+  // Cards custom menus
+  const menuCards = (customMenus || []).map(m =>
+    buildCard('cm_'+m.id, m.icon||'📂', m.name, m.currency||'$', m.data||[])
+  ).join('');
 
   wrap.innerHTML = `
     <div class="dcm-section">
-      <div class="dcm-section-title">
-        <span>📂</span> Menús personalizados
-      </div>
-      <div class="dcm-grid">${cardsHTML}</div>
+      <div class="dcm-section-title"><span>🗂</span> Vista general</div>
+      <div class="dcm-grid">${homeCard}${menuCards}</div>
     </div>`;
 
-  // Construir charts después de que el DOM existe
+  // Construir charts (DOM ya existe)
   requestAnimationFrame(() => {
-    customMenus.forEach(m => {
-      const data = m.data || [];
+    // Fuente de datos: home + custom menus
+    const sources = [
+      { id:'home', data: homeTxs },
+      ...(customMenus||[]).map(m => ({ id:'cm_'+m.id, data: m.data||[] }))
+    ];
+
+    sources.forEach(({id, data}) => {
       if (!data.length) return;
 
-      // Ingresos por categoría
-      const incCats = {};
-      data.filter(t=>t.type==='income').forEach(t=>{
-        incCats[t.category] = (incCats[t.category]||0) + t.amount;
+      const incCats = {}, expCats = {};
+      data.forEach(t => {
+        if (t.type==='income') incCats[t.category] = (incCats[t.category]||0) + t.amount;
+        else                   expCats[t.category] = (expCats[t.category]||0) + t.amount;
       });
       const incEntries = Object.entries(incCats).sort((a,b)=>b[1]-a[1]).slice(0,7);
-
-      // Gastos por categoría
-      const expCats = {};
-      data.filter(t=>t.type==='expense').forEach(t=>{
-        expCats[t.category] = (expCats[t.category]||0) + t.amount;
-      });
       const expEntries = Object.entries(expCats).sort((a,b)=>b[1]-a[1]).slice(0,7);
 
-      const ctxInc = document.getElementById('dcm-chart-inc-'+m.id);
-      const ctxExp = document.getElementById('dcm-chart-exp-'+m.id);
+      const ctxInc = document.getElementById('dcm-chart-inc-'+id);
+      const ctxExp = document.getElementById('dcm-chart-exp-'+id);
 
       if (ctxInc && incEntries.length) {
-        _cmDashCharts['inc_'+m.id] = new Chart(ctxInc.getContext('2d'), {
+        _cmDashCharts['inc_'+id] = new Chart(ctxInc.getContext('2d'), {
           type:'doughnut',
-          data:{
-            labels: incEntries.map(([k])=>catLabel(k)),
-            datasets:[{
-              data: incEntries.map(([,v])=>v),
-              backgroundColor: incEntries.map(([k],i)=>getCatColor(k,i)),
-              borderWidth:2, borderColor:'#1e293b'
-            }]
-          },
-          options: PIE_OPTS('bottom')
+          data:{ labels: incEntries.map(([k])=>catLabel(k)), datasets:[{ data: incEntries.map(([,v])=>v), backgroundColor: incEntries.map(([k],i)=>getCatColor(k,i)), borderWidth:2, borderColor:'#1e293b' }] },
+          options: PIE_OPTS()
         });
       } else if (ctxInc) {
         ctxInc.closest('.dcm-chart-wrap').innerHTML += '<div class="dcm-empty" style="margin-top:-6px">Sin ingresos</div>';
       }
 
       if (ctxExp && expEntries.length) {
-        _cmDashCharts['exp_'+m.id] = new Chart(ctxExp.getContext('2d'), {
+        _cmDashCharts['exp_'+id] = new Chart(ctxExp.getContext('2d'), {
           type:'doughnut',
-          data:{
-            labels: expEntries.map(([k])=>catLabel(k)),
-            datasets:[{
-              data: expEntries.map(([,v])=>v),
-              backgroundColor: expEntries.map(([k],i)=>getCatColor(k,i)),
-              borderWidth:2, borderColor:'#1e293b'
-            }]
-          },
-          options: PIE_OPTS('bottom')
+          data:{ labels: expEntries.map(([k])=>catLabel(k)), datasets:[{ data: expEntries.map(([,v])=>v), backgroundColor: expEntries.map(([k],i)=>getCatColor(k,i)), borderWidth:2, borderColor:'#1e293b' }] },
+          options: PIE_OPTS()
         });
       } else if (ctxExp) {
         ctxExp.closest('.dcm-chart-wrap').innerHTML += '<div class="dcm-empty" style="margin-top:-6px">Sin gastos</div>';
@@ -2328,9 +2257,6 @@ function switchView(el) {
   currentView = vId;
   const titles = {
     'view-dashboard':'Dashboard',
-    'view-monthly':'Por Mes',
-    'view-history':'Historial completo',
-    'view-balance':'Balance & Proyecciones',
     'view-deudas':'Deudas',
     'view-home':'🏠 Home Billings'
   };
