@@ -2105,8 +2105,13 @@ function updateCatOptions() {
   const prev = sel.value;
   const type = document.getElementById('tx-type')?.value;
   const cats = type === 'income' ? globalCats.inc : globalCats.exp;
+  const other = type === 'income' ? globalCats.exp : globalCats.inc;
   sel.innerHTML = Object.entries(cats).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
-  if (cats[prev]) sel.value = prev;
+  // Si la categoría guardada no está en el tipo actual, agregar desde el tipo opuesto
+  if (prev && !cats[prev] && other[prev]) {
+    sel.insertAdjacentHTML('beforeend', `<option value="${prev}">${other[prev].label}</option>`);
+  }
+  if (prev) sel.value = prev;
   updateTxColorPicker();
 }
 
@@ -2313,13 +2318,18 @@ function populateHomeCatFilter() {
 }
 
 function updateHomeCatOptions() {
-  const type = document.getElementById('home-tx-type').value;
+  const type = document.getElementById('home-tx-type')?.value;
   const cats = type === 'income' ? globalCats.inc : globalCats.exp;
+  const other = type === 'income' ? globalCats.exp : globalCats.inc;
   const sel = document.getElementById('home-tx-cat');
   if (!sel) return;
   const prev = sel.value;
   sel.innerHTML = Object.entries(cats).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
-  if (cats[prev]) sel.value = prev;
+  // Si la categoría guardada no está en el tipo actual, agregar desde el tipo opuesto
+  if (prev && !cats[prev] && other[prev]) {
+    sel.insertAdjacentHTML('beforeend', `<option value="${prev}">${other[prev].label}</option>`);
+  }
+  if (prev) sel.value = prev;
   updateHomeTxColorPicker();
 }
 
@@ -2409,7 +2419,14 @@ function renderHome() {
 function openHomeTxModal(id) {
   editingHomeId = id || null;
   const del = document.getElementById('home-del-btn');
-  updateHomeCatOptions();
+  // 1. Defaults
+  document.getElementById('home-tx-id').value = '';
+  document.getElementById('home-tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('home-tx-amount').value = '';
+  document.getElementById('home-tx-desc').value = '';
+  document.getElementById('home-tx-type').value = 'expense';
+  document.getElementById('home-tx-notes').value = '';
+  // 2. Edición: sobrescribir con datos reales
   if (id) {
     const t = homeTxs.find(x=>x.id===id);
     if (!t) return;
@@ -2419,22 +2436,20 @@ function openHomeTxModal(id) {
     document.getElementById('home-tx-amount').value = t.amount;
     document.getElementById('home-tx-desc').value = t.description;
     document.getElementById('home-tx-type').value = t.type;
-    updateHomeCatOptions();
-    document.getElementById('home-tx-cat').value = t.category;
     document.getElementById('home-tx-notes').value = t.notes || '';
-    updateHomeTxColorPicker();
     del.style.display = 'inline-flex';
   } else {
     document.getElementById('home-modal-title').textContent = '🏠 Nueva entrada hogar';
-    document.getElementById('home-tx-id').value = '';
-    document.getElementById('home-tx-date').value = new Date().toISOString().split('T')[0];
-    document.getElementById('home-tx-amount').value = '';
-    document.getElementById('home-tx-desc').value = '';
-    document.getElementById('home-tx-type').value = 'expense';
-    updateHomeCatOptions();
-    document.getElementById('home-tx-notes').value = '';
     del.style.display = 'none';
   }
+  // 3. Cargar categorías según tipo ya establecido
+  updateHomeCatOptions();
+  // 4. Restaurar categoría guardada
+  if (id) {
+    const t = homeTxs.find(x=>x.id===id);
+    if (t) document.getElementById('home-tx-cat').value = t.category;
+  }
+  updateHomeTxColorPicker();
   document.getElementById('home-tx-modal').classList.add('open');
 }
 
@@ -3117,11 +3132,18 @@ function renderCustomMenuView(menuId) {
 
 function openCustomTxModal(menuId, txId) {
   activeCustomMenuId = menuId;
-  // Reutilizar lógica de home pero contra el array del custom menu
   const m = customMenus.find(x=>x.id===menuId);
   if (!m) return;
   const del = document.getElementById('home-del-btn');
   document.getElementById('home-modal-curr').textContent = '(' + m.currency + ')';
+  // 1. Defaults
+  document.getElementById('home-tx-id').value = '';
+  document.getElementById('home-tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('home-tx-amount').value = '';
+  document.getElementById('home-tx-desc').value = '';
+  document.getElementById('home-tx-type').value = 'expense';
+  document.getElementById('home-tx-notes').value = '';
+  // 2. Edición: sobrescribir con datos reales
   if (txId) {
     const t = m.data.find(x=>x.id===txId);
     if (!t) return;
@@ -3131,21 +3153,21 @@ function openCustomTxModal(menuId, txId) {
     document.getElementById('home-tx-amount').value = t.amount;
     document.getElementById('home-tx-desc').value = t.description;
     document.getElementById('home-tx-type').value = t.type;
-    document.getElementById('home-tx-cat').innerHTML = `<option value="${t.category}">${t.category}</option>`;
     document.getElementById('home-tx-notes').value = t.notes || '';
     del.style.display = 'inline-flex';
     del.onclick = () => deleteCustomTx(menuId, t.id);
   } else {
     document.getElementById('home-modal-title').textContent = m.icon + ' Nuevo registro — ' + m.name;
-    document.getElementById('home-tx-id').value = '';
-    document.getElementById('home-tx-date').value = new Date().toISOString().split('T')[0];
-    document.getElementById('home-tx-amount').value = '';
-    document.getElementById('home-tx-desc').value = '';
-    document.getElementById('home-tx-type').value = 'expense';
-    document.getElementById('home-tx-cat').innerHTML = '<option value="general">General</option>';
-    document.getElementById('home-tx-notes').value = '';
     del.style.display = 'none';
   }
+  // 3. Cargar categorías según tipo ya establecido
+  updateHomeCatOptions();
+  // 4. Restaurar categoría guardada
+  if (txId) {
+    const t = m.data.find(x=>x.id===txId);
+    if (t) document.getElementById('home-tx-cat').value = t.category;
+  }
+  updateHomeTxColorPicker();
   document.getElementById('home-tx-modal').classList.add('open');
 }
 
