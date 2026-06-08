@@ -839,7 +839,7 @@
       <div class="cards" id="home-cards"></div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos (hogar)</h3><canvas id="chart-home-monthly"></canvas></div>
-        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="chart-home-cat"></canvas></div>
+        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal('home')" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="chart-home-cat"></canvas></div>
       </div>
       <button class="filter-toggle-btn" onclick="toggleFilters('home-filters','hf-search','hf-type','hf-cat','hf-month')">
         🔍 Buscar y filtrar
@@ -1217,7 +1217,7 @@
     <div id="catcolors-body" style="max-height:380px;overflow-y:auto"></div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn btn-ghost" onclick="closeCatColorsModal()">Cerrar</button>
-      <button class="btn btn-primary" onclick="refreshAllCatCharts(); scheduleSave(); closeCatColorsModal();">Guardar</button>
+      <button class="btn btn-primary" onclick="(_catModalSource==='home'?renderHome():refreshAllCatCharts()); scheduleSave(); closeCatColorsModal();">Guardar</button>
     </div>
   </div>
 </div>
@@ -1353,7 +1353,9 @@ let homeTxs = [];
 let users = [];        // [{id, name, password, role}]
 let customMenus = [];  // [{id, name, icon, currency, pin, access, catsInc, catsExp, data, nextId, charts}]
 const DEFAULT_CAT_COLORS = ['#3b82f6','#ef4444','#f59e0b','#22c55e','#8b5cf6','#06b6d4','#ec4899','#f97316'];
-let catColors = {};  // {categoryKey: '#hexcolor'}
+let catColors = {};      // {categoryKey: '#hexcolor'} — Zelle + custom menus
+let homeCatColors = {};  // {categoryKey: '#hexcolor'} — Home Billings
+let _catModalSource = 'main'; // 'main' | 'home'
 let currentUser = null; // usuario logueado
 let nextUserId = 1;
 let nextMenuId = 1;
@@ -1439,7 +1441,8 @@ function initFromDrive(data) {
     if (c.homeCatsInc) HOME_CATS_INC  = c.homeCatsInc;
     if (c.homeCatsExp) HOME_CATS_EXP  = c.homeCatsExp;
     if (c.homeCurr)    HOME_CURR      = c.homeCurr;
-    if (c.catColors)   catColors      = c.catColors;
+    if (c.catColors)     catColors     = c.catColors;
+    if (c.homeCatColors) homeCatColors = c.homeCatColors;
     rebuildHomeCatsAll();
     if (c.users && c.users.length)        { users = c.users; nextUserId = Math.max(...users.map(u=>u.id))+1; }
     if (c.customMenus && c.customMenus.length) {
@@ -1454,7 +1457,7 @@ function initFromDrive(data) {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
       config:{catAll:CAT_ALL,homeCatsInc:HOME_CATS_INC,homeCatsExp:HOME_CATS_EXP,
-              homeCurr:HOME_CURR,users:users,customMenus:customMenus,catColors:catColors}
+              homeCurr:HOME_CURR,users:users,customMenus:customMenus,catColors:catColors,homeCatColors:homeCatColors}
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
@@ -1480,7 +1483,7 @@ function pushToDrive() {
     lastUpdated: new Date().toISOString(),
     config: {
       catAll:CAT_ALL, homeCatsInc:HOME_CATS_INC, homeCatsExp:HOME_CATS_EXP,
-      homeCurr:HOME_CURR, users:users, customMenus:menusPayload, catColors:catColors
+      homeCurr:HOME_CURR, users:users, customMenus:menusPayload, catColors:catColors, homeCatColors:homeCatColors
     },
     transactions:txs, deudas:deudas, home:homeTxs
   };
@@ -1688,6 +1691,21 @@ function renderChartMonthly() {
 function getCatColor(key, idx) {
   return catColors[key] || DEFAULT_CAT_COLORS[idx % DEFAULT_CAT_COLORS.length];
 }
+function getHomeCatColor(key, idx) {
+  return homeCatColors[key] || DEFAULT_CAT_COLORS[idx % DEFAULT_CAT_COLORS.length];
+}
+// Helpers usados por los handlers inline del modal
+function _setCatColor(key, val) {
+  if (_catModalSource === 'home') { homeCatColors[key] = val; try{renderHome();}catch(e){} }
+  else { catColors[key] = val; refreshAllCatCharts(); }
+}
+function _delCatColor(key, defColor) {
+  if (_catModalSource === 'home') { delete homeCatColors[key]; try{renderHome();}catch(e){} }
+  else { delete catColors[key]; refreshAllCatCharts(); }
+  const inp = document.querySelector('#catcolors-body input[data-key="'+key+'"]');
+  if (inp) inp.value = defColor;
+  scheduleSave();
+}
 
 function renderChartCat() {
   const cats = {};
@@ -1705,33 +1723,39 @@ function renderChartCat() {
   });
 }
 
-function openCatColorsModal() {
-  // Recoger categorías con gastos, ordenadas por monto
+function openCatColorsModal(source) {
+  _catModalSource = source || 'main';
+  const isHome = _catModalSource === 'home';
+  const dataset   = isHome ? homeTxs : txs;
+  const colorMap  = isHome ? homeCatColors : catColors;
+  const labelFn   = isHome ? homeCatLabel : catLabel;
+
   const cats = {};
-  txs.filter(t=>t.type==='expense').forEach(t=>{
+  dataset.filter(t=>t.type==='expense').forEach(t=>{
     cats[t.category] = (cats[t.category]||0) + t.amount;
   });
   const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
   const rows = sorted.map(([key, amt], i) => {
-    const color = getCatColor(key, i);
-    const label = catLabel(key);
+    const color    = colorMap[key] || DEFAULT_CAT_COLORS[i % DEFAULT_CAT_COLORS.length];
+    const label    = labelFn(key);
+    const defColor = DEFAULT_CAT_COLORS[i % DEFAULT_CAT_COLORS.length];
     return `
       <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
         <input type="color" value="${color}" data-key="${key}"
-          oninput="catColors['${key}']=this.value; renderChartCat();"
+          oninput="_setCatColor('${key}', this.value);"
           onchange="scheduleSave();"
           style="width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:6px;padding:0">
         <span style="flex:1;font-size:.88rem">${label}</span>
         <span style="font-size:.75rem;color:var(--text2)">${fmt(amt)}</span>
-        <button onclick="delete catColors['${key}']; document.querySelector('input[data-key=\\'${key}\\']').value='${DEFAULT_CAT_COLORS[i%DEFAULT_CAT_COLORS.length]}'; renderChartCat(); scheduleSave();"
+        <button onclick="_delCatColor('${key}','${defColor}');"
           title="Restablecer" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.8rem;padding:2px 6px">↺</button>
       </div>`;
   }).join('');
 
   const body = document.getElementById('catcolors-body');
   if (body) {
-    body.innerHTML = rows;
+    body.innerHTML = rows || '<p style="color:var(--text2);font-size:.82rem;padding:12px 0">Sin gastos registrados.</p>';
     document.getElementById('catcolors-modal').classList.add('open');
   }
 }
@@ -2135,7 +2159,7 @@ function renderHome() {
   const cats = {};
   homeTxs.filter(t=>t.type==='expense').forEach(t=>{ cats[t.category]=(cats[t.category]||0)+t.amount; });
   const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,9);
-  const colors = sorted.map(([key], i) => getCatColor(key, i));
+  const colors = sorted.map(([key], i) => getHomeCatColor(key, i));
   const ctx2 = document.getElementById('chart-home-cat').getContext('2d');
   if (chartHomeCat) chartHomeCat.destroy();
   chartHomeCat = new Chart(ctx2, {
