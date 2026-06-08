@@ -1,10 +1,10 @@
 /**
- * CashMap — Service Worker
+ * CashMap — Service Worker v1.1
  * Para deploy en servidor propio (GitHub Pages, Netlify, etc.)
  * Coloca este archivo en la misma carpeta que index.html
  */
 
-const CACHE_NAME = 'cashmap-v1.0';
+const CACHE_NAME = 'cashmap-v1.1';
 const APP_SHELL  = [
   './',
   './index.html',
@@ -45,9 +45,13 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
   // 1. Llamadas al backend de Apps Script → Network only (siempre fresco)
-  if (url.hostname === 'script.google.com' || url.pathname.includes('?action=')) {
+  // Incluye script.googleusercontent.com porque Apps Script redirige ahí
+  if (url.hostname === 'script.google.com' ||
+      url.hostname === 'script.googleusercontent.com' ||
+      url.hostname.endsWith('.googleusercontent.com') ||
+      url.search.includes('action=')) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { redirect: 'follow' })
         .catch(() => new Response(
           JSON.stringify({ error: 'offline', message: 'Sin conexión al servidor' }),
           { headers: { 'Content-Type': 'application/json' } }
