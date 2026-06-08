@@ -1531,18 +1531,25 @@ function pushToDrive() {
   }
 
   // Modo API externa (CASHMAP_API_URL configurado)
+  // Nota: usar text/plain evita el preflight CORS que GAS no maneja
   if (CASHMAP_API_URL) {
     fetch(CASHMAP_API_URL, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'text/plain;charset=UTF-8'},
       body: JSON.stringify(payload)
     })
-    .then(r => r.json())
-    .then(r => {
+    .then(r => r.text())
+    .then(text => {
+      let r;
+      try { r = JSON.parse(text); } catch(e) {
+        console.error('[CashMap] Respuesta no-JSON del servidor:', text.slice(0, 300));
+        setSyncBadge('error');
+        return;
+      }
       if (r && r.ok) setSyncBadge('ok', '✅ Guardado');
-      else setSyncBadge('error');
+      else { console.error('[CashMap] Error del servidor:', r); setSyncBadge('error'); }
     })
-    .catch(() => { pendingOfflineChanges = true; setSyncBadge('error'); });
+    .catch(err => { console.error('[CashMap] Error de red al guardar:', err); pendingOfflineChanges = true; setSyncBadge('error'); });
     return;
   }
 
