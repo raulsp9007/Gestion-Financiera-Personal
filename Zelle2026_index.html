@@ -67,6 +67,28 @@
   .chart-box{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px}
   .chart-box h3{font-size:.85rem;font-weight:600;margin-bottom:14px;color:var(--text2)}
   .chart-box canvas{max-height:220px}
+  /* DASH CUSTOM MENU CARDS */
+  .dcm-section{margin-top:24px}
+  .dcm-section-title{font-size:.8rem;font-weight:600;color:var(--text2);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px;padding:0 2px;display:flex;align-items:center;gap:8px}
+  .dcm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+  .dcm-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+  .dcm-card-head{display:flex;align-items:center;gap:8px}
+  .dcm-card-icon{font-size:1.3rem;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:var(--bg3);border-radius:10px;flex-shrink:0}
+  .dcm-card-name{font-size:.95rem;font-weight:700;flex:1}
+  .dcm-card-curr{font-size:.72rem;color:var(--text2);background:var(--bg3);padding:2px 8px;border-radius:99px}
+  .dcm-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .dcm-stat{background:var(--bg3);border-radius:10px;padding:9px 10px;text-align:center}
+  .dcm-stat .lbl{font-size:.68rem;color:var(--text2);margin-bottom:3px}
+  .dcm-stat .val{font-size:.88rem;font-weight:700}
+  .dcm-stat .val.income{color:var(--green)}
+  .dcm-stat .val.expense{color:var(--red)}
+  .dcm-stat .val.net-pos{color:var(--green)}
+  .dcm-stat .val.net-neg{color:var(--red)}
+  .dcm-charts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .dcm-chart-wrap{display:flex;flex-direction:column;gap:6px}
+  .dcm-chart-lbl{font-size:.7rem;color:var(--text2);font-weight:600;text-align:center;letter-spacing:.04em}
+  .dcm-chart-wrap canvas{max-height:160px}
+  .dcm-empty{font-size:.78rem;color:var(--text2);text-align:center;padding:20px 0}
   /* TABLE */
   .tbl-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden}
   .tbl-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
@@ -315,6 +337,11 @@
     .chart-box{padding:14px 12px;border-radius:12px}
     .chart-box h3{font-size:.78rem;margin-bottom:10px}
     .chart-box canvas{max-height:160px}
+    /* ── DCM mobile ─────────────────────────────────────────── */
+    .dcm-grid{grid-template-columns:1fr}
+    .dcm-stats{gap:6px}
+    .dcm-stat{padding:7px 8px}
+    .dcm-stat .val{font-size:.82rem}
 
     /* ── Filtros: toggle colapsable ─────────────────────────── */
     .filters{
@@ -747,6 +774,8 @@
         <div class="tbl-scroll"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Descripción</th><th>Tipo</th><th>Categoría</th></tr></thead>
         <tbody id="recent-tbody"></tbody></table></div>
       </div>
+      <!-- Stats de menús personalizados -->
+      <div id="dash-custom-menus"></div>
     </div>
 
     <!-- ===== MONTHLY ===== -->
@@ -1423,6 +1452,7 @@ let currentView = 'view-dashboard';
 let currentMonth = '06';
 let chartMonthly = null, chartCat = null, chartBalance = null;
 let chartHomeMonthly = null, chartHomeCat = null;
+const _cmDashCharts = {}; // instancias Chart por menú: {inc_ID, exp_ID}
 let editingId = null;
 let saveTimeout = null;
 const SAVE_DELAY = 900;
@@ -1735,6 +1765,7 @@ function renderDash() {
 
   renderChartMonthly();
   renderChartCat();
+  renderDashCustomMenus();
 }
 
 function renderChartMonthly() {
@@ -1793,6 +1824,145 @@ function renderChartCat() {
     type:'doughnut',
     data:{labels:sorted.map(([c])=>catLabel(c)),datasets:[{data:sorted.map(([,v])=>v),backgroundColor:colors,borderWidth:2,borderColor:'#1e293b'}]},
     options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}}}}
+  });
+}
+
+// ── Dashboard: stats de menús personalizados ────────────────────
+function renderDashCustomMenus() {
+  const wrap = document.getElementById('dash-custom-menus');
+  if (!wrap) return;
+
+  if (!customMenus || !customMenus.length) {
+    wrap.innerHTML = '';
+    return;
+  }
+
+  // Destruir charts previas
+  Object.keys(_cmDashCharts).forEach(k => {
+    try { _cmDashCharts[k].destroy(); } catch(e) {}
+    delete _cmDashCharts[k];
+  });
+
+  const PIE_OPTS = (position) => ({
+    responsive: true,
+    plugins: {
+      legend: {
+        position: position || 'bottom',
+        labels: { color:'#94a3b8', font:{size:9}, padding:6, boxWidth:10 }
+      },
+      tooltip: {
+        callbacks: {
+          label: ctx => ' ' + ctx.label + ': ' + ctx.raw.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})
+        }
+      }
+    }
+  });
+
+  const cardsHTML = customMenus.map(m => {
+    const data = m.data || [];
+    const curr = m.currency || '';
+    const fmt2 = v => curr + (v||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+    const totalInc = data.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+    const totalExp = data.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+    const net = totalInc - totalExp;
+    const netClass = net >= 0 ? 'net-pos' : 'net-neg';
+    const netStr = (net>=0?'+':'') + fmt2(Math.abs(net));
+    const count = data.length;
+
+    return `
+    <div class="dcm-card">
+      <div class="dcm-card-head">
+        <div class="dcm-card-icon">${m.icon||'📂'}</div>
+        <div class="dcm-card-name">${m.name}</div>
+        <span class="dcm-card-curr">${curr}</span>
+      </div>
+      <div class="dcm-stats">
+        <div class="dcm-stat"><div class="lbl">Ingresos</div><div class="val income">${fmt2(totalInc)}</div></div>
+        <div class="dcm-stat"><div class="lbl">Gastos</div><div class="val expense">${fmt2(totalExp)}</div></div>
+        <div class="dcm-stat"><div class="lbl">Balance</div><div class="val ${netClass}">${netStr}</div></div>
+      </div>
+      ${count === 0
+        ? `<div class="dcm-empty">Sin registros aún</div>`
+        : `<div class="dcm-charts">
+            <div class="dcm-chart-wrap">
+              <div class="dcm-chart-lbl">💚 Ingresos por cat.</div>
+              <canvas id="dcm-chart-inc-${m.id}"></canvas>
+            </div>
+            <div class="dcm-chart-wrap">
+              <div class="dcm-chart-lbl">🔴 Gastos por cat.</div>
+              <canvas id="dcm-chart-exp-${m.id}"></canvas>
+            </div>
+           </div>`
+      }
+    </div>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="dcm-section">
+      <div class="dcm-section-title">
+        <span>📂</span> Menús personalizados
+      </div>
+      <div class="dcm-grid">${cardsHTML}</div>
+    </div>`;
+
+  // Construir charts después de que el DOM existe
+  requestAnimationFrame(() => {
+    customMenus.forEach(m => {
+      const data = m.data || [];
+      if (!data.length) return;
+
+      // Ingresos por categoría
+      const incCats = {};
+      data.filter(t=>t.type==='income').forEach(t=>{
+        incCats[t.category] = (incCats[t.category]||0) + t.amount;
+      });
+      const incEntries = Object.entries(incCats).sort((a,b)=>b[1]-a[1]).slice(0,7);
+
+      // Gastos por categoría
+      const expCats = {};
+      data.filter(t=>t.type==='expense').forEach(t=>{
+        expCats[t.category] = (expCats[t.category]||0) + t.amount;
+      });
+      const expEntries = Object.entries(expCats).sort((a,b)=>b[1]-a[1]).slice(0,7);
+
+      const ctxInc = document.getElementById('dcm-chart-inc-'+m.id);
+      const ctxExp = document.getElementById('dcm-chart-exp-'+m.id);
+
+      if (ctxInc && incEntries.length) {
+        _cmDashCharts['inc_'+m.id] = new Chart(ctxInc.getContext('2d'), {
+          type:'doughnut',
+          data:{
+            labels: incEntries.map(([k])=>catLabel(k)),
+            datasets:[{
+              data: incEntries.map(([,v])=>v),
+              backgroundColor: incEntries.map(([k],i)=>getCatColor(k,i)),
+              borderWidth:2, borderColor:'#1e293b'
+            }]
+          },
+          options: PIE_OPTS('bottom')
+        });
+      } else if (ctxInc) {
+        ctxInc.closest('.dcm-chart-wrap').innerHTML += '<div class="dcm-empty" style="margin-top:-6px">Sin ingresos</div>';
+      }
+
+      if (ctxExp && expEntries.length) {
+        _cmDashCharts['exp_'+m.id] = new Chart(ctxExp.getContext('2d'), {
+          type:'doughnut',
+          data:{
+            labels: expEntries.map(([k])=>catLabel(k)),
+            datasets:[{
+              data: expEntries.map(([,v])=>v),
+              backgroundColor: expEntries.map(([k],i)=>getCatColor(k,i)),
+              borderWidth:2, borderColor:'#1e293b'
+            }]
+          },
+          options: PIE_OPTS('bottom')
+        });
+      } else if (ctxExp) {
+        ctxExp.closest('.dcm-chart-wrap').innerHTML += '<div class="dcm-empty" style="margin-top:-6px">Sin gastos</div>';
+      }
+    });
   });
 }
 
