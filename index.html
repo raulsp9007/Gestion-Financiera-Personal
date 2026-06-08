@@ -764,19 +764,6 @@
 
     <!-- ===== DASHBOARD ===== -->
     <div id="view-dashboard" class="view active">
-      <div class="charts">
-        <div class="chart-box"><h3>Ingresos vs Gastos</h3><canvas id="chart-monthly"></canvas></div>
-        <div class="chart-box">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <h3 style="margin:0">Por categoría</h3>
-            <select id="chart-cat-type" onchange="renderChartCat()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:.8rem;cursor:pointer">
-              <option value="expense">🔴 Gastos</option>
-              <option value="income">💚 Ingresos</option>
-            </select>
-          </div>
-          <canvas id="chart-cat"></canvas>
-        </div>
-      </div>
       <div id="dash-custom-menus"></div>
     </div>
 
@@ -1751,26 +1738,7 @@ function renderAll() {
 // DASHBOARD
 // ============================================================
 function renderDash() {
-  renderChartMonthly();
-  renderChartCat();
   renderDashCustomMenus();
-}
-
-function renderChartMonthly() {
-  const months = availableMonths();
-  const inc = months.map(m=>txs.filter(t=>txMonth(t)===m&&t.type==='income').reduce((s,t)=>s+t.amount,0));
-  const exp = months.map(m=>txs.filter(t=>txMonth(t)===m&&t.type==='expense').reduce((s,t)=>s+t.amount,0));
-  const labels = months.map(m=>monthName(m).slice(0,3));
-  const ctx = document.getElementById('chart-monthly').getContext('2d');
-  if (chartMonthly) chartMonthly.destroy();
-  chartMonthly = new Chart(ctx, {
-    type:'bar',
-    data:{labels,datasets:[
-      {label:'Ingresos',data:inc,backgroundColor:'rgba(34,197,94,.7)',borderColor:'#22c55e',borderWidth:1},
-      {label:'Gastos',data:exp,backgroundColor:'rgba(239,68,68,.7)',borderColor:'#ef4444',borderWidth:1}
-    ]},
-    options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'}}}}
-  });
 }
 
 function getCatColor(key, idx) {
@@ -1799,25 +1767,7 @@ function _delCatColor(key, defColor) {
   scheduleSave();
 }
 
-function renderChartCat() {
-  const chartType = document.getElementById('chart-cat-type')?.value || 'expense';
-  const cats = {};
-  txs.filter(t => t.type === chartType).forEach(t => {
-    cats[t.category] = (cats[t.category] || 0) + t.amount;
-  });
-  const sorted = Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const colors = sorted.map(([key], i) => getCatColor(key, i));
-  const ctx = document.getElementById('chart-cat').getContext('2d');
-  if (chartCat) chartCat.destroy();
-  chartCat = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: sorted.map(([c]) => catLabel(c)),
-      datasets: [{ data: sorted.map(([, v]) => v), backgroundColor: colors, borderWidth: 2, borderColor: '#1e293b' }]
-    },
-    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 }, padding: 8 } } } }
-  });
-}
+function renderChartCat() { /* canvas removido del Dashboard */ }
 
 // ── Dashboard: Vista general ─────────────────────────────────────
 function renderDashCustomMenus() {
