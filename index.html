@@ -2919,14 +2919,40 @@ function showToast(msg, color) {
 // ============================================================
 // AUTH — LOGIN / LOGOUT
 // ============================================================
+const SESSION_KEY = 'cashmap_session';
+const SESSION_TTL = 24 * 60 * 60 * 1000; // 24h en ms
+
+function saveSession(user) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: user.id, loginTime: Date.now() }));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const { userId, loginTime } = JSON.parse(raw);
+    if (Date.now() - loginTime > SESSION_TTL) { clearSession(); return null; }
+    return users.find(u => u.id === userId) || null;
+  } catch(e) { clearSession(); return null; }
+}
+
 function initAuth() {
   if (users.length === 0) {
-    // Sin usuarios configurados: acceso libre, pero mostrar botón admin
     document.getElementById('login-screen').classList.add('hidden');
     renderApp();
     return;
   }
-  // Poblar selector de usuarios
+  const saved = loadSession();
+  if (saved) {
+    currentUser = saved;
+    document.getElementById('login-screen').classList.add('hidden');
+    renderApp();
+    return;
+  }
   const sel = document.getElementById('login-user-sel');
   sel.innerHTML = users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
   document.getElementById('login-pass').value = '';
@@ -2943,6 +2969,7 @@ function doLogin() {
     return;
   }
   currentUser = user;
+  saveSession(user);
   document.getElementById('login-screen').classList.add('hidden');
   renderApp();
 }
@@ -2955,6 +2982,7 @@ function renderApp() {
 }
 
 function logout() {
+  clearSession();
   currentUser = null;
   if (users.length > 0) {
     initAuth();
@@ -2963,7 +2991,9 @@ function logout() {
 
 function openUserMenu() {
   if (!currentUser) return;
-  if (confirm(`Sesión: ${currentUser.name} (${currentUser.role})\n¿Cerrar sesión?`)) logout();
+  const session = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
+  const remaining = session.loginTime ? Math.max(0, Math.round((SESSION_TTL - (Date.now() - session.loginTime)) / 3600000)) : 0;
+  if (confirm(`Sesión: ${currentUser.name} (${currentUser.role})\nExpira en ~${remaining}h\n¿Cerrar sesión?`)) logout();
 }
 
 function applyRoleUI() {
