@@ -725,13 +725,7 @@
     <h1>💰 CashMap</h1>
     <p>Gestión Financiera Personal</p>
   </div>
-  <nav>
-    <a class="active" data-view="view-dashboard" onclick="switchView(this)"><span class="ico">📊</span> Dashboard</a>
-    <a data-view="view-deudas" onclick="switchView(this)"><span class="ico">💳</span> Deudas</a>
-    <a data-view="view-home" onclick="switchView(this)"><span class="ico">🏠</span> Home Billings</a>
-    <!-- Menús personalizados — inyectados dinámicamente por JS -->
-    <div id="sidebar-custom-menus"></div>
-  </nav>
+  <nav id="sidebar-nav"></nav>
   <div id="user-area" style="padding:10px 12px;border-top:1px solid var(--border);display:none">
     <div id="user-badge" onclick="openUserMenu()">
       <span id="user-badge-name">—</span>
@@ -1129,6 +1123,7 @@
     <div style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap">
       <button class="cats-tab active" data-atab="users" onclick="switchAdminTab('users')">👤 Usuarios</button>
       <button class="cats-tab" data-atab="menus" onclick="switchAdminTab('menus')">📂 Menús personalizados</button>
+      <button class="cats-tab" data-atab="nav-order" onclick="switchAdminTab('nav-order')">🗂 Orden</button>
     </div>
 
     <!-- TAB USUARIOS -->
@@ -1205,6 +1200,12 @@
         </div>
         <input type="hidden" id="mf-id">
       </div>
+    </div>
+
+    <!-- TAB ORDEN -->
+    <div id="atab-nav-order" style="display:none">
+      <p style="font-size:.8rem;color:var(--text2);margin-bottom:12px">Usa ▲▼ para ordenar el menú lateral.</p>
+      <div id="nav-order-list"></div>
     </div>
 
     <div class="modal-actions" style="margin-top:12px">
@@ -1429,6 +1430,13 @@ let homeTxs = [];
 // ---- Auth & custom menus ----
 let users = [];        // [{id, name, password, role}]
 let customMenus = [];  // [{id, name, icon, currency, pin, access, catsInc, catsExp, data, nextId, charts}]
+let navOrder = [];     // ['dashboard','deudas','home','custom-1',...]
+
+const STATIC_NAV = {
+  dashboard: { label: 'Dashboard',     ico: '📊', view: 'view-dashboard' },
+  deudas:    { label: 'Deudas',        ico: '💳', view: 'view-deudas'    },
+  home:      { label: 'Home Billings', ico: '🏠', view: 'view-home'      },
+};
 const DEFAULT_CAT_COLORS = ['#3b82f6','#ef4444','#f59e0b','#22c55e','#8b5cf6','#06b6d4','#ec4899','#f97316'];
 let catColors = {};      // {categoryKey: '#hexcolor'} — Zelle + custom menus
 let homeCatColors = {};  // {categoryKey: '#hexcolor'} — Home Billings
@@ -1537,6 +1545,7 @@ function initFromDrive(data) {
       customMenus = c.customMenus;
       nextMenuId = Math.max(...customMenus.map(m=>m.id))+1;
     }
+    if (c.navOrder && c.navOrder.length) navOrder = c.navOrder;
   }
   if (!data) scheduleSave();
 
@@ -1544,7 +1553,7 @@ function initFromDrive(data) {
   try {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus}
+      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder}
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
@@ -1569,7 +1578,7 @@ function pushToDrive() {
     version: 1,
     lastUpdated: new Date().toISOString(),
     config: {
-      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload
+      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder
     },
     transactions:txs, deudas:deudas, home:homeTxs
   };
@@ -3028,22 +3037,34 @@ function isReadOnly() {
 }
 
 function renderNavForUser() {
-  // Sidebar: mostrar/ocultar custom menu links basado en acceso
-  document.querySelectorAll('[data-custom-menu]').forEach(a => {
-    const mid = parseInt(a.dataset.customMenu);
-    const m = customMenus.find(x=>x.id===mid);
-    a.style.display = (m && canAccess(m.access)) ? '' : 'none';
-  });
+  buildSidebarNav();
   // Bottom-nav "Más" visible si hay custom menus accesibles
   const accessible = customMenus.filter(m=>canAccess(m.access));
   const bnMore = document.getElementById('bn-more');
   if (bnMore) bnMore.style.display = accessible.length ? '' : 'none';
-  // Drawer
   buildMoreDrawer();
-  // Ocultar botones de edición para viewers
   if (isReadOnly()) {
     document.querySelectorAll('#btn-new,#fab').forEach(b=>b.style.display='none');
   }
+}
+
+function buildSidebarNav() {
+  const nav = document.getElementById('sidebar-nav');
+  if (!nav) return;
+  const allKeys = ['dashboard','deudas','home',...customMenus.map(m=>'custom-'+m.id)];
+  allKeys.forEach(k => { if (!navOrder.includes(k)) navOrder.push(k); });
+  navOrder = navOrder.filter(k => allKeys.includes(k));
+  nav.innerHTML = navOrder.map(key => {
+    if (STATIC_NAV[key]) {
+      const {label, ico, view} = STATIC_NAV[key];
+      return `<a data-view="${view}" onclick="switchView(this)"><span class="ico">${ico}</span> ${label}</a>`;
+    }
+    const mid = parseInt(key.replace('custom-',''));
+    const m = customMenus.find(x=>x.id===mid);
+    if (!m || !canAccess(m.access)) return '';
+    return `<a data-view="view-custom-${m.id}" data-custom-menu="${m.id}" onclick="checkPinAndSwitch(${m.id},this)"><span class="ico">${m.icon}</span> ${m.name}</a>`;
+  }).join('');
+  nav.querySelectorAll(`[data-view="${currentView}"]`).forEach(a=>a.classList.add('active'));
 }
 
 // ============================================================
@@ -3051,9 +3072,7 @@ function renderNavForUser() {
 // ============================================================
 function buildCustomMenuViews() {
   const slot = document.getElementById('custom-views-slot');
-  const sidebarSlot = document.getElementById('sidebar-custom-menus');
   slot.innerHTML = '';
-  sidebarSlot.innerHTML = '';
 
   customMenus.forEach(m => {
     // Inyectar vista HTML
@@ -3093,14 +3112,6 @@ function buildCustomMenuViews() {
       </div>`;
     slot.appendChild(div);
 
-    // Sidebar link
-    const a = document.createElement('a');
-    a.dataset.view = 'view-custom-' + m.id;
-    a.dataset.customMenu = m.id;
-    a.onclick = function(){ checkPinAndSwitch(m.id, this); };
-    a.innerHTML = `<span class="ico">${m.icon}</span> ${m.name}`;
-    sidebarSlot.appendChild(a);
-
     // Init chart holders
     if (!customCharts[m.id]) customCharts[m.id] = {monthly:null, cat:null};
   });
@@ -3108,8 +3119,11 @@ function buildCustomMenuViews() {
 
 function buildMoreDrawer() {
   const drawer = document.getElementById('more-drawer');
-  const accessible = customMenus.filter(m=>canAccess(m.access));
-  drawer.innerHTML = accessible.map(m=>`
+  const orderedCustom = navOrder
+    .filter(k => k.startsWith('custom-'))
+    .map(k => customMenus.find(m => m.id === parseInt(k.replace('custom-',''))))
+    .filter(m => m && canAccess(m.access));
+  drawer.innerHTML = orderedCustom.map(m=>`
     <a data-view="view-custom-${m.id}" onclick="checkPinAndSwitch(${m.id},this)">${m.icon} ${m.name}</a>
   `).join('') || '<div style="color:var(--text2);font-size:.82rem;padding:8px">Sin menús personalizados</div>';
 }
@@ -3334,8 +3348,10 @@ function switchAdminTab(tab) {
   document.querySelectorAll('[data-atab]').forEach(b=>b.classList.toggle('active', b.dataset.atab===tab));
   document.getElementById('atab-users').style.display = tab==='users'?'':'none';
   document.getElementById('atab-menus').style.display = tab==='menus'?'':'none';
+  document.getElementById('atab-nav-order').style.display = tab==='nav-order'?'':'none';
   if (tab==='users') renderUsersList();
   if (tab==='menus') renderMenusList();
+  if (tab==='nav-order') renderNavOrderTab();
 }
 
 // ---- Usuarios ----
@@ -3397,6 +3413,40 @@ function deleteUser(id) {
   renderUsersList();
   scheduleSave();
   showToast('Usuario eliminado','var(--red)');
+}
+
+// ---- Orden del nav ----
+function renderNavOrderTab() {
+  const list = document.getElementById('nav-order-list');
+  const allKeys = ['dashboard','deudas','home',...customMenus.map(m=>'custom-'+m.id)];
+  allKeys.forEach(k => { if (!navOrder.includes(k)) navOrder.push(k); });
+  navOrder = navOrder.filter(k => allKeys.includes(k));
+  list.innerHTML = navOrder.map((key, i) => {
+    let label, ico;
+    if (STATIC_NAV[key]) { label = STATIC_NAV[key].label; ico = STATIC_NAV[key].ico; }
+    else {
+      const mid = parseInt(key.replace('custom-',''));
+      const m = customMenus.find(x=>x.id===mid);
+      if (!m) return '';
+      label = m.name; ico = m.icon;
+    }
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
+      <span style="font-size:1.1rem">${ico}</span>
+      <span style="flex:1;font-size:.87rem;font-weight:500">${label}</span>
+      <button onclick="moveNavItem(${i},-1)" ${i===0?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;color:var(--text2);font-size:.9rem">▲</button>
+      <button onclick="moveNavItem(${i},1)" ${i===navOrder.length-1?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;color:var(--text2);font-size:.9rem">▼</button>
+    </div>`;
+  }).join('');
+}
+
+function moveNavItem(idx, dir) {
+  const ni = idx + dir;
+  if (ni < 0 || ni >= navOrder.length) return;
+  [navOrder[idx], navOrder[ni]] = [navOrder[ni], navOrder[idx]];
+  buildSidebarNav();
+  buildMoreDrawer();
+  renderNavOrderTab();
+  scheduleSave();
 }
 
 // ---- Menús personalizados ----
