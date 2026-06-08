@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zelle 2026 – Gestión Financiera</title>
+<style>
+:root {
+  --primary:#1a56db; --primary-dark:#1e3a8a; --primary-light:rgba(26,86,219,0.08);
+  --sidebar-bg:#0f172a; --content-bg:#f1f5f9; --card-bg:#ffffff;
+  --border:#e2e8f0; --text-primary:#0f172a; --text-secondary:#64748b;
+  --income:#059669; --income-bg:#d1fae5; --expense:#dc2626; --expense-bg:#fee2e2;
+  --shadow:0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md:0 4px 6px -1px rgba(0,0,0,0.1); --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--content-bg);color:var(--text-primary);display:flex;height:100vh;overflow:hidden;font-size:14px}
+
+/* ── SIDEBAR ── */
+#sidebar{width:240px;background:var(--sidebar-bg);display:flex;flex-direction:column;flex-shrink:0}
+.logo{padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.07)}
+.logo-title{color:#fff;font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+.logo-sub{color:#475569;font-size:11px;margin-top:3px}
+.nav-section{padding:14px 10px 0;flex:1}
+.nav-label{color:#334155;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;padding:0 10px 8px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:7px;color:#94a3b8;cursor:pointer;font-size:13.5px;margin-bottom:1px;transition:all .15s;border:none;background:none;width:100%;text-align:left;font-family:inherit}
+.nav-item:hover{background:rgba(255,255,255,0.06);color:#e2e8f0}
+.nav-item.active{background:var(--primary);color:#fff}
+.nav-icon{width:16px;text-align:center;font-size:15px}
+.sidebar-footer{padding:16px 20px;border-top:1px solid rgba(255,255,255,0.07)}
+.year-pill{background:var(--primary);color:white;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block}
+.sidebar-footer p{color:#475569;font-size:11px;margin-bottom:6px}
+
+/* ── MAIN ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#topbar{background:var(--card-bg);padding:12px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:var(--shadow)}
+#topbar h2{font-size:17px;font-weight:700;white-space:nowrap}
+.topbar-right{display:flex;align-items:center;gap:8px}
+#content{flex:1;overflow-y:auto;padding:24px 28px}
+
+/* ── SYNC BADGE ── */
+.sync-badge{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:inherit;white-space:nowrap;transition:all .15s}
+.sync-idle{background:#f1f5f9;color:#64748b;border:1px solid var(--border)}
+.sync-idle:hover{background:#e2e8f0}
+.sync-ok{background:#d1fae5;color:#059669;border:1px solid #a7f3d0}
+.sync-ok:hover{background:#a7f3d0}
+.sync-ing{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}
+.sync-err{background:var(--expense-bg);color:var(--expense);border:1px solid #fca5a5}
+.sync-err:hover{background:#fecaca}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning{display:inline-block;animation:spin 1s linear infinite}
+
+/* ── CARDS ── */
+.cards-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.card{background:var(--card-bg);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.card-icon{font-size:22px;margin-bottom:10px}
+.card-label{font-size:11px;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.card-value{font-size:22px;font-weight:700;line-height:1}
+.card-value.income{color:var(--income)}
+.card-value.expense{color:var(--expense)}
+.card-sub{font-size:11px;color:var(--text-secondary);margin-top:5px}
+
+/* ── CHARTS ── */
+.charts-grid{display:grid;grid-template-columns:3fr 2fr;gap:14px;margin-bottom:20px}
+.chart-card{background:var(--card-bg);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.chart-title{font-size:13px;font-weight:700;margin-bottom:14px}
+
+/* ── TABLE ── */
+.table-card{background:var(--card-bg);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden}
+.table-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px}
+.table-header h3{font-size:14px;font-weight:700}
+.filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.filter-btn{padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:white;font-size:12px;cursor:pointer;color:var(--text-secondary);transition:all .15s;font-family:inherit}
+.filter-btn.active{background:var(--primary);color:white;border-color:var(--primary)}
+.filter-btn:hover:not(.active){background:var(--content-bg);color:var(--text-primary)}
+.btn-primary{padding:8px 15px;background:var(--primary);color:white;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;font-family:inherit;white-space:nowrap}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-sm{padding:4px 9px;font-size:11px;border-radius:5px;border:1px solid var(--border);background:white;cursor:pointer;color:var(--text-secondary);font-family:inherit;transition:all .15s}
+.btn-sm:hover{background:var(--content-bg)}
+.btn-danger:hover{background:var(--expense-bg);color:var(--expense);border-color:#fca5a5}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead{background:#f8fafc}
+th{text-align:left;padding:9px 16px;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 16px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafafa}
+.empty-row td{text-align:center;padding:32px;color:var(--text-secondary);font-style:italic}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge-income{background:var(--income-bg);color:var(--income)}
+.badge-expense{background:var(--expense-bg);color:var(--expense)}
+.amount-income{color:var(--income);font-weight:700}
+.amount-expense{color:var(--expense);font-weight:700}
+.cat-chip{font-size:11px;color:var(--text-secondary)}
+
+/* ── MONTH TABS ── */
+.month-tabs{display:flex;gap:3px;margin-bottom:18px;background:var(--card-bg);padding:5px;border-radius:9px;border:1px solid var(--border);width:fit-content;flex-wrap:wrap}
+.month-tab{padding:6px 14px;border-radius:6px;border:none;background:none;cursor:pointer;font-size:12.5px;font-weight:500;color:var(--text-secondary);transition:all .15s;font-family:inherit}
+.month-tab.active{background:var(--primary);color:white;font-weight:600}
+.month-tab:hover:not(.active){background:var(--content-bg);color:var(--text-primary)}
+
+/* ── FILTERS ── */
+.search-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.search-input{flex:1;min-width:200px;padding:8px 13px;border:1px solid var(--border);border-radius:7px;font-size:13px;outline:none;font-family:inherit;transition:border .15s}
+.search-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.filter-select{padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:white;outline:none;color:var(--text-primary);cursor:pointer;font-family:inherit}
+.filter-select:focus{border-color:var(--primary)}
+.month-summary{padding:12px 18px;background:#f8fafc;border-top:1px solid var(--border);display:flex;gap:20px;font-size:12.5px;align-items:center;flex-wrap:wrap}
+
+/* ── MODAL BASE ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(3px);opacity:0;visibility:hidden;transition:all .2s}
+.modal-overlay.open{opacity:1;visibility:visible}
+.modal{background:white;border-radius:14px;padding:28px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,.25);transform:translateY(16px);transition:transform .2s}
+.modal-overlay.open .modal{transform:translateY(0)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+.modal-header h3{font-size:17px;font-weight:700}
+.modal-close{border:none;background:none;font-size:20px;cursor:pointer;color:var(--text-secondary);padding:2px 6px;border-radius:4px}
+.modal-close:hover{background:var(--content-bg)}
+.form-group{margin-bottom:14px}
+.form-label{font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;display:block}
+.form-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:13.5px;outline:none;transition:border .15s;font-family:inherit;color:var(--text-primary)}
+.form-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.type-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.type-btn{padding:11px;border:2px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-weight:600;font-size:13px;transition:all .15s;text-align:center;font-family:inherit}
+.type-btn.income.active{border-color:var(--income);background:var(--income-bg);color:var(--income)}
+.type-btn.expense.active{border-color:var(--expense);background:var(--expense-bg);color:var(--expense)}
+.modal-actions{display:flex;gap:8px;margin-top:22px;justify-content:flex-end}
+.btn-cancel{padding:9px 18px;border:1px solid var(--border);background:white;border-radius:7px;font-size:13px;cursor:pointer;font-family:inherit}
+.btn-cancel:hover{background:var(--content-bg)}
+
+/* ── SETUP MODAL EXTRAS ── */
+.steps-box{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:14px;font-size:13px;line-height:1.9}
+.steps-box ol{margin-left:18px}
+.steps-box strong{color:var(--text-primary)}
+.code-wrap{position:relative;margin-bottom:14px}
+.code-block{background:#1e293b;color:#e2e8f0;padding:14px;border-radius:8px;font-size:11.5px;font-family:'Consolas','Courier New',monospace;overflow-x:auto;max-height:180px;overflow-y:auto;line-height:1.5;white-space:pre}
+.copy-btn{position:absolute;top:8px;right:8px;padding:4px 10px;background:rgba(255,255,255,.15);color:#e2e8f0;border:1px solid rgba(255,255,255,.2);border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;transition:background .15s}
+.copy-btn:hover{background:rgba(255,255,255,.25)}
+.sync-result{padding:10px 14px;border-radius:7px;font-size:12.5px;font-weight:500;margin-top:10px;display:none}
+.sync-result.ok{background:var(--income-bg);color:var(--income);display:block}
+.sync-result.error{background:var(--expense-bg);color:var(--expense);display:block}
+.link-a{color:var(--primary);text-decoration:none;font-weight:600}
+.link-a:hover{text-decoration:underline}
+.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
+
+/* ── VIEWS / BALANCE / MISC ── */
+.view{display:none}
+.view.active{display:block}
+.balance-pos{color:var(--income);font-weight:700}
+.balance-neg{color:var(--expense);font-weight:700}
+.notes-text{color:#94a3b8;font-size:11px;display:block;margin-top:2px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+.toast{position:fixed;bottom:22px;right:22px;background:#1e293b;color:white;padding:11px 18px;border-radius:9px;font-size:13px;font-weight:500;transform:translateY(12px);opacity:0;transition:all .25s;z-index:2000;box-shadow:var(--shadow-md)}
+.toast.show{transform:translateY(0);opacity:1}
+</style>
+</head>
+<body>
+
+<!-- ═══ SIDEBAR ═══ -->
+<nav id="sidebar">
+  <div class="logo">
+    <div class="logo-title">💳 Zelle 2026</div>
+    <div class="logo-sub">Gestión Financiera Personal</div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-label">Menú</div>
+    <button class="nav-item active" onclick="showView('dashboard')"><span class="nav-icon">📊</span> Dashboard</button>
+    <button class="nav-item" onclick="showView('monthly')"><span class="nav-icon">📅</span> Por Mes</button>
+    <button class="nav-item" onclick="showView('history')"><span class="nav-icon">📋</span> Historial</button>
+    <button class="nav-item" onclick="showView('balance')"><span class="nav-icon">💰</span> Balance</button>
+  </div>
+  <div class="sidebar-footer">
+    <p>Período activo</p>
+    <span class="year-pill">Enero – Junio 2026</span>
+  </div>
+</nav>
+
+<!-- ═══ MAIN ═══ -->
+<div id="main">
+  <div id="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <div class="topbar-right">
+      <button id="sync-badge" class="sync-badge sync-idle" onclick="openSetup()">🔗 Conectar Sheets</button>
+      <button class="btn-primary" onclick="openModal()">＋ Nueva Transacción</button>
+    </div>
+  </div>
+
+  <div id="content">
+
+    <!-- ─── DASHBOARD ─── -->
+    <div id="view-dashboard" class="view active">
+      <div class="cards-grid" id="summary-cards"></div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Ingresos vs Gastos por Mes</div>
+          <div style="position:relative;height:230px"><canvas id="barChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Gastos por Categoría</div>
+          <div style="position:relative;height:230px"><canvas id="pieChart"></canvas></div>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="table-header">
+          <h3>Últimas Transacciones</h3>
+          <span style="font-size:12px;color:var(--text-secondary)">8 más recientes</span>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Monto</th></tr></thead>
+          <tbody id="recent-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── POR MES ─── -->
+    <div id="view-monthly" class="view">
+      <div class="month-tabs" id="month-tabs"></div>
+      <div class="table-card">
+        <div class="table-header">
+          <h3 id="monthly-title">Enero 2026</h3>
+          <div class="filters">
+            <button class="filter-btn active" onclick="setMonthFilter('all',this)">Todos</button>
+            <button class="filter-btn" onclick="setMonthFilter('income',this)">Ingresos</button>
+            <button class="filter-btn" onclick="setMonthFilter('expense',this)">Gastos</button>
+            <button class="btn-primary" style="margin-left:6px" onclick="openModal()">＋ Agregar</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Día</th><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Monto</th><th>Acciones</th></tr></thead>
+          <tbody id="monthly-tbody"></tbody></table>
+        </div>
+        <div class="month-summary" id="monthly-summary"></div>
+      </div>
+    </div>
+
+    <!-- ─── HISTORIAL ─── -->
+    <div id="view-history" class="view">
+      <div class="search-bar">
+        <input type="text" class="search-input" placeholder="🔍  Buscar por descripción o nota..." id="search-input" oninput="renderHistory()">
+        <select class="filter-select" id="filter-month" onchange="renderHistory()">
+          <option value="">Todos los meses</option>
+          <option>Enero</option><option>Febrero</option><option>Marzo</option>
+          <option>Abril</option><option>Mayo</option><option>Junio</option>
+        </select>
+        <select class="filter-select" id="filter-cat" onchange="renderHistory()">
+          <option value="">Todas las categorías</option>
+          <option value="salario">Salario</option><option value="trabajo">Trabajo (EGP)</option>
+          <option value="cobros">Cobros</option><option value="ventas">Ventas</option>
+          <option value="pagos">Pagos</option><option value="envios">Envíos</option>
+          <option value="compras">Compras</option><option value="prestamos">Préstamos</option>
+          <option value="otros">Otros</option>
+        </select>
+        <select class="filter-select" id="filter-type" onchange="renderHistory()">
+          <option value="">Ingreso y Gasto</option>
+          <option value="income">Solo Ingresos</option>
+          <option value="expense">Solo Gastos</option>
+        </select>
+      </div>
+      <div class="table-card">
+        <div class="table-header">
+          <h3>Todas las Transacciones</h3>
+          <span id="history-count" style="font-size:12px;color:var(--text-secondary)"></span>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Monto</th><th>Acciones</th></tr></thead>
+          <tbody id="history-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── BALANCE ─── -->
+    <div id="view-balance" class="view">
+      <div class="cards-grid" id="balance-cards" style="grid-template-columns:repeat(3,1fr)"></div>
+      <div class="chart-card" style="margin-bottom:20px">
+        <div class="chart-title">Balance Acumulado — Enero a Junio 2026</div>
+        <div style="position:relative;height:200px"><canvas id="lineChart"></canvas></div>
+      </div>
+      <div class="table-card">
+        <div class="table-header"><h3>Resumen por Mes</h3></div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Neto del Mes</th><th>Balance Acumulado</th></tr></thead>
+          <tbody id="balance-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ MODAL TRANSACCIÓN ═══ -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOnOverlay(event)">
+  <div class="modal" style="width:460px">
+    <div class="modal-header">
+      <h3 id="modal-title">Nueva Transacción</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tipo de Movimiento</label>
+      <div class="type-toggle">
+        <button class="type-btn income active" id="btn-income" onclick="setType('income')">📈 Ingreso</button>
+        <button class="type-btn expense" id="btn-expense" onclick="setType('expense')">📉 Gasto</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Fecha</label><input type="date" class="form-input" id="input-date"></div>
+      <div class="form-group"><label class="form-label">Monto (USD)</label><input type="number" step="0.01" min="0.01" class="form-input" id="input-amount" placeholder="0.00"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Descripción</label><input type="text" class="form-input" id="input-desc" placeholder="Ej: Salario, EGP#54, Venta a 500…"></div>
+    <div class="form-group">
+      <label class="form-label">Categoría</label>
+      <select class="form-input" id="input-cat">
+        <option value="salario">💼 Salario</option><option value="trabajo">🖥️ Trabajo (EGP)</option>
+        <option value="cobros">👤 Cobros</option><option value="ventas">💱 Ventas</option>
+        <option value="pagos">💸 Pagos</option><option value="envios">📦 Envíos</option>
+        <option value="compras">🛒 Compras</option><option value="prestamos">🤝 Préstamos</option>
+        <option value="otros">📌 Otros</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Notas (opcional)</label><input type="text" class="form-input" id="input-notes" placeholder="Observaciones adicionales…"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" onclick="saveTransaction()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL SETUP SHEETS ═══ -->
+<div class="modal-overlay" id="setup-overlay" onclick="closeSetupOnOverlay(event)">
+  <div class="modal" style="width:560px;max-width:96vw">
+    <div class="modal-header">
+      <h3>🔗 Sincronizar con Google Sheets</h3>
+      <button class="modal-close" onclick="closeSetup()">✕</button>
+    </div>
+
+    <div class="steps-box">
+      <strong>Pasos de configuración (se hace una sola vez):</strong>
+      <ol>
+        <li>Abre tu <a class="link-a" href="https://docs.google.com/spreadsheets/d/1WDH6KQE2RnMIi7BxFu28ptTcti8IeUu8/edit" target="_blank">Google Spreadsheet ↗</a></li>
+        <li>Ve a <strong>Extensiones → Apps Script</strong></li>
+        <li>Borra todo el código existente y pega el siguiente:</li>
+      </ol>
+    </div>
+
+    <div class="code-wrap">
+      <div class="code-block" id="apps-script-code">// Zelle 2026 - Sync Script
+const SS_ID = '1WDH6KQE2RnMIi7BxFu28ptTcti8IeUu8';
+const TAB   = 'ZelleApp';
+
+function doGet(e) {
+  const d = e.parameter.data
+    ? JSON.parse(decodeURIComponent(e.parameter.data))
+    : { action: 'read' };
+  return respond(handle(d));
+}
+
+function handle(d) {
+  const ss = SpreadsheetApp.openById(SS_ID);
+  let sh = ss.getSheetByName(TAB);
+  if (!sh) {
+    sh = ss.insertSheet(TAB);
+    sh.appendRow(['id','date','amount','description','type','category','notes']);
+  }
+
+  if (d.action === 'read') {
+    if (sh.getLastRow() <= 1) return [];
+    const [h, ...rows] = sh.getDataRange().getValues();
+    return rows.map(r => ({
+      id: +r[0], date: r[1], amount: +r[2],
+      description: r[3], type: r[4],
+      category: r[5], notes: r[6]
+    }));
+  }
+
+  if (d.action === 'clear') {
+    if (sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow() - 1);
+    return { ok: true };
+  }
+
+  if (d.action === 'add_batch') {
+    const vals = d.batch.map(t =>
+      [t.id, t.date, t.amount, t.description||'', t.type, t.category, t.notes||'']
+    );
+    sh.getRange(sh.getLastRow() + 1, 1, vals.length, 7).setValues(vals);
+    return { ok: true };
+  }
+
+  if (d.action === 'add') {
+    const t = d.tx;
+    sh.appendRow([t.id, t.date, t.amount, t.description||'', t.type, t.category, t.notes||'']);
+    return { ok: true };
+  }
+
+  if (d.action === 'update') {
+    const vals = sh.getDataRange().getValues();
+    for (let i = 1; i < vals.length; i++) {
+      if (String(vals[i][0]) === String(d.tx.id)) {
+        const t = d.tx;
+        sh.getRange(i + 1, 1, 1, 7).setValues(
+          [[t.id, t.date, t.amount, t.description||'', t.type, t.category, t.notes||'']]
+        );
+        return { ok: true };
+      }
+    }
+    return { error: 'not found' };
+  }
+
+  if (d.action === 'delete') {
+    const vals = sh.getDataRange().getValues();
+    for (let i = 1; i < vals.length; i++) {
+      if (String(vals[i][0]) === String(d.id)) {
+        sh.deleteRow(i + 1);
+        return { ok: true };
+      }
+    }
+    return { error: 'not found' };
+  }
+
+  return { error: 'unknown action' };
+}
+
+function respond(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}</div>
+      <button class="copy-btn" onclick="copyCode()">📋 Copiar</button>
+    </div>
+
+    <div class="steps-box">
+      <ol start="4">
+        <li>Guarda el proyecto <strong>(Ctrl+S / ⌘S)</strong></li>
+        <li>Clic en <strong>Implementar → Nueva implementación</strong></li>
+        <li>Tipo: <strong>Aplicación web</strong></li>
+        <li>Ejecutar como: <strong>Yo (tu cuenta)</strong></li>
+        <li>Quién tiene acceso: <strong>Cualquier persona</strong></li>
+        <li>Clic en <strong>Implementar</strong>, autoriza y copia la URL que aparece</li>
+        <li>Pega la URL aquí abajo y haz clic en <strong>Conectar</strong></li>
+      </ol>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">URL de la Aplicación Web</label>
+      <input type="url" class="form-input" id="sync-url-input"
+        placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+    <div id="sync-result" class="sync-result"></div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeSetup()">Cancelar</button>
+      <button id="connect-btn" class="btn-primary" onclick="connectSheets()">🔗 Conectar y Sincronizar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ════════════════════════════════════
+//  CONSTANTS & DATA
+// ════════════════════════════════════
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio'];
+const CAT = {
+  salario:'💼 Salario',   trabajo:'🖥️ Trabajo',  cobros:'👤 Cobros',
+  ventas:'💱 Ventas',     pagos:'💸 Pagos',       envios:'📦 Envíos',
+  compras:'🛒 Compras',   prestamos:'🤝 Préstamos', otros:'📌 Otros'
+};
+
+const SEED = [
+  {id:1,  date:'2026-01-01',amount:5.57,   description:'Saldo inicial 2025',           type:'income',  category:'otros',     notes:''},
+  {id:2,  date:'2026-01-09',amount:30.00,  description:'Aylem',                        type:'income',  category:'cobros',    notes:''},
+  {id:3,  date:'2026-01-09',amount:8.99,   description:'',                             type:'income',  category:'otros',     notes:''},
+  {id:4,  date:'2026-01-09',amount:-22.00, description:'Venta a 415',                 type:'expense', category:'ventas',    notes:''},
+  {id:5,  date:'2026-01-10',amount:-30.00, description:'Venta a 415',                 type:'expense', category:'ventas',    notes:''},
+  {id:6,  date:'2026-01-16',amount:99.03,  description:'EGP#50 – Lissett Dieppa',     type:'income',  category:'trabajo',   notes:'Ganancia: $34.30'},
+  {id:7,  date:'2026-01-16',amount:-65.00, description:'Venta a 460',                 type:'expense', category:'ventas',    notes:''},
+  {id:8,  date:'2026-01-18',amount:250.00, description:'Salario',                     type:'income',  category:'salario',   notes:''},
+  {id:9,  date:'2026-01-18',amount:30.00,  description:'Denia',                       type:'income',  category:'cobros',    notes:''},
+  {id:10, date:'2026-01-18',amount:-100.00,description:'Jose',                        type:'expense', category:'pagos',     notes:''},
+  {id:11, date:'2026-01-18',amount:-100.00,description:'Venta a 460',                 type:'expense', category:'ventas',    notes:''},
+  {id:12, date:'2026-01-21',amount:-15.00, description:'Thalia',                      type:'expense', category:'pagos',     notes:''},
+  {id:13, date:'2026-01-21',amount:-35.00, description:'Venta a 450',                 type:'expense', category:'ventas',    notes:''},
+  {id:14, date:'2026-01-30',amount:-40.00, description:'Venta a 450',                 type:'expense', category:'ventas',    notes:''},
+  {id:15, date:'2026-02-06',amount:-50.00, description:'Venta a 458',                 type:'expense', category:'ventas',    notes:''},
+  {id:16, date:'2026-02-06',amount:45.16,  description:'EGP#51 – Richard Santiesteban',type:'income', category:'trabajo',   notes:'Ganancia: $12.34'},
+  {id:17, date:'2026-02-06',amount:-32.00, description:'Venta a 450',                 type:'expense', category:'ventas',    notes:''},
+  {id:18, date:'2026-02-10',amount:25.00,  description:'Panes Yobanica',              type:'income',  category:'cobros',    notes:''},
+  {id:19, date:'2026-02-12',amount:50.00,  description:'Papa',                        type:'income',  category:'cobros',    notes:''},
+  {id:20, date:'2026-02-13',amount:-50.00, description:'Venta a 465',                 type:'expense', category:'ventas',    notes:''},
+  {id:21, date:'2026-02-15',amount:-70.00, description:'Venta a 460',                 type:'expense', category:'ventas',    notes:'para pagar puerta'},
+  {id:22, date:'2026-02-21',amount:74.24,  description:'',                            type:'income',  category:'otros',     notes:''},
+  {id:23, date:'2026-02-23',amount:16.00,  description:'EGP# – Deinova',              type:'income',  category:'trabajo',   notes:'Ganancia: $5.24'},
+  {id:24, date:'2026-02-25',amount:300.00, description:'Salario',                     type:'income',  category:'salario',   notes:''},
+  {id:25, date:'2026-02-25',amount:-100.00,description:'Venta a 467',                 type:'expense', category:'ventas',    notes:''},
+  {id:26, date:'2026-02-25',amount:-50.00, description:'Venta a 460',                 type:'expense', category:'ventas',    notes:''},
+  {id:27, date:'2026-03-08',amount:25.00,  description:'De Papa a Thalia',            type:'income',  category:'cobros',    notes:''},
+  {id:28, date:'2026-03-11',amount:-550.00,description:'Motor',                       type:'expense', category:'compras',   notes:'300 eran de ORO'},
+  {id:29, date:'2026-03-18',amount:-100.00,description:'Venta a 475',                 type:'expense', category:'ventas',    notes:'Cumple gordi'},
+  {id:30, date:'2026-03-19',amount:25.00,  description:'Papa',                        type:'income',  category:'cobros',    notes:''},
+  {id:31, date:'2026-03-21',amount:25.00,  description:'EGP#SN – Marjoris',           type:'income',  category:'trabajo',   notes:'Ganancia: $8.44'},
+  {id:32, date:'2026-03-28',amount:250.00, description:'Salario',                     type:'income',  category:'salario',   notes:'Quedan 200 de Guille'},
+  {id:33, date:'2026-03-28',amount:-100.00,description:'Minardo',                     type:'expense', category:'pagos',     notes:''},
+  {id:34, date:'2026-03-28',amount:-60.00, description:'Chery',                       type:'expense', category:'pagos',     notes:''},
+  {id:35, date:'2026-03-29',amount:405.00, description:'Henys',                       type:'income',  category:'cobros',    notes:''},
+  {id:36, date:'2026-03-29',amount:-80.00, description:'Pago Javier & Luis',          type:'expense', category:'pagos',     notes:''},
+  {id:37, date:'2026-03-29',amount:-100.00,description:'PagoMario',                   type:'expense', category:'pagos',     notes:'Quedan 200 de Guille'},
+  {id:38, date:'2026-03-30',amount:-20.00, description:'Venta a 475',                 type:'expense', category:'ventas',    notes:''},
+  {id:39, date:'2026-04-01',amount:53.84,  description:'EGP#52 – Daili',              type:'income',  category:'trabajo',   notes:'Ganancia: $13.93'},
+  {id:40, date:'2026-04-01',amount:-40.00, description:'Venta a 475',                 type:'expense', category:'ventas',    notes:''},
+  {id:41, date:'2026-04-02',amount:135.00, description:'EGP#53 – Ayleem',             type:'income',  category:'trabajo',   notes:'Ganancia: $41.06'},
+  {id:42, date:'2026-04-03',amount:-100.00,description:'Venta a 475',                 type:'expense', category:'ventas',    notes:''},
+  {id:43, date:'2026-04-06',amount:-50.00, description:'Venta a 475',                 type:'expense', category:'ventas',    notes:''},
+  {id:44, date:'2026-04-08',amount:30.00,  description:'EGPSN# – Marjoris',           type:'income',  category:'trabajo',   notes:''},
+  {id:45, date:'2026-04-08',amount:-20.00, description:'Venta a 470',                 type:'expense', category:'ventas',    notes:''},
+  {id:46, date:'2026-04-10',amount:50.00,  description:'Papá',                        type:'income',  category:'cobros',    notes:''},
+  {id:47, date:'2026-04-20',amount:-50.00, description:'Venta a 475',                 type:'expense', category:'ventas',    notes:''},
+  {id:48, date:'2026-04-22',amount:280.00, description:'Salario (+56)',                type:'income',  category:'salario',   notes:''},
+  {id:49, date:'2026-04-22',amount:-60.00, description:'Venta a 480',                 type:'expense', category:'ventas',    notes:''},
+  {id:50, date:'2026-04-22',amount:-60.00, description:'Chery',                       type:'expense', category:'pagos',     notes:''},
+  {id:51, date:'2026-04-23',amount:-100.00,description:'Pago de Mario',               type:'expense', category:'pagos',     notes:''},
+  {id:52, date:'2026-04-23',amount:-40.00, description:'Préstamo a Leonel',           type:'expense', category:'prestamos', notes:''},
+  {id:53, date:'2026-04-24',amount:-200.00,description:'Pago de Guille',              type:'expense', category:'pagos',     notes:''},
+  {id:54, date:'2026-04-25',amount:-15.00, description:'Thalia',                      type:'expense', category:'pagos',     notes:''},
+  {id:55, date:'2026-04-28',amount:30.00,  description:'Tania',                       type:'income',  category:'cobros',    notes:''},
+  {id:56, date:'2026-05-02',amount:-15.00, description:'Thalia',                      type:'expense', category:'pagos',     notes:''},
+  {id:57, date:'2026-05-04',amount:30.00,  description:'Tania',                       type:'income',  category:'cobros',    notes:''},
+  {id:58, date:'2026-05-07',amount:100.00, description:'Papa',                        type:'income',  category:'cobros',    notes:''},
+  {id:59, date:'2026-05-08',amount:40.51,  description:'Daili',                       type:'income',  category:'cobros',    notes:''},
+  {id:60, date:'2026-05-08',amount:30.00,  description:'Dayi',                        type:'income',  category:'cobros',    notes:''},
+  {id:61, date:'2026-05-13',amount:100.00, description:'Papa',                        type:'income',  category:'cobros',    notes:''},
+  {id:62, date:'2026-05-14',amount:-230.00,description:'Envío a David',               type:'expense', category:'envios',    notes:''},
+  {id:63, date:'2026-05-27',amount:40.00,  description:'Dayli',                       type:'income',  category:'cobros',    notes:'200 en efectivo'},
+  {id:64, date:'2026-05-30',amount:174.00, description:'Cobro Mayo',                  type:'income',  category:'cobros',    notes:"ésta gente no es fácil"},
+  {id:65, date:'2026-06-04',amount:-80.00, description:'Envío a David',               type:'expense', category:'envios',    notes:''},
+  {id:66, date:'2026-06-05',amount:600.00, description:'Salario Compuesto',           type:'income',  category:'salario',   notes:''},
+  {id:67, date:'2026-06-05',amount:-200.00,description:'Mario',                       type:'expense', category:'pagos',     notes:'traer en efectivo'},
+  {id:68, date:'2026-06-05',amount:-100.00,description:'Vila',                        type:'expense', category:'pagos',     notes:'Javier traer en efectivo'},
+  {id:69, date:'2026-06-06',amount:-80.00, description:'Venta a 600',                 type:'expense', category:'ventas',    notes:''},
+  {id:70, date:'2026-06-06',amount:-32.23, description:'Disipador',                   type:'expense', category:'compras',   notes:''},
+];
+
+// ════════════════════════════════════
+//  STATE
+// ════════════════════════════════════
+let txs          = JSON.parse(localStorage.getItem('zelle2026_v2') || 'null') || SEED;
+let nextId       = Math.max(...txs.map(t=>t.id)) + 1;
+let currentView  = 'dashboard';
+let currentMonth = 0;
+let monthFilter  = 'all';
+let editingId    = null;
+let txType       = 'income';
+let charts       = {};
+let syncUrl      = localStorage.getItem('zelle_sync_url') || '';
+let syncStatus   = syncUrl ? 'idle' : 'none';
+
+// ════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════
+function save() { localStorage.setItem('zelle2026_v2', JSON.stringify(txs)); }
+function fmtAbs(n) { return '$' + Math.abs(n).toFixed(2); }
+function fmtDate(d) { const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; }
+function getMonthIdx(d) { return parseInt(d.split('-')[1]) - 1; }
+function monthStats(idx) {
+  const ms = txs.filter(t=>getMonthIdx(t.date)===idx);
+  const inc = ms.filter(t=>t.type==='income').reduce((s,t)=>s+Math.abs(t.amount),0);
+  const exp = ms.filter(t=>t.type==='expense').reduce((s,t)=>s+Math.abs(t.amount),0);
+  return { inc, exp, net:inc-exp, count:ms.length };
+}
+function actionBtns(id) {
+  return `<button class="btn-sm" onclick="editTx(${id})" style="margin-right:3px">✏️</button>
+          <button class="btn-sm btn-danger" onclick="deleteTx(${id})">🗑️</button>`;
+}
+function descCell(t) {
+  return (t.description||'<em style="color:#94a3b8">Sin descripción</em>') +
+    (t.notes ? `<span class="notes-text">📝 ${t.notes}</span>` : '');
+}
+
+// ════════════════════════════════════
+//  SYNC — Google Sheets via Apps Script
+// ════════════════════════════════════
+function setSyncBadge(s, msg) {
+  const el = document.getElementById('sync-badge');
+  const map = {
+    none:    { cls:'sync-idle',  txt:'🔗 Conectar Sheets' },
+    idle:    { cls:'sync-idle',  txt:'🔗 Reconectar Sheets' },
+    syncing: { cls:'sync-ing',   txt:`<span class="spinning">🔄</span> ${msg||'Sincronizando...'}` },
+    ok:      { cls:'sync-ok',    txt:'🟢 Sheets Conectado' },
+    error:   { cls:'sync-err',   txt:'🔴 Error de Sync' }
+  };
+  const st = map[s] || map.none;
+  el.className = 'sync-badge ' + st.cls;
+  el.innerHTML = st.txt;
+  el.onclick = (s==='ok') ? ()=>syncNow() : ()=>openSetup();
+  el.title = (s==='ok') ? 'Clic para sincronizar ahora' : 'Configurar sincronización';
+}
+
+async function sheetCall(data) {
+  if (!syncUrl) return null;
+  const url = syncUrl + '?data=' + encodeURIComponent(JSON.stringify(data)) + '&t=' + Date.now();
+  const res = await fetch(url, { redirect:'follow' });
+  return res.json();
+}
+
+async function loadFromSheets() {
+  if (!syncUrl) return false;
+  try {
+    setSyncBadge('syncing', 'Cargando datos...');
+    const data = await sheetCall({ action:'read' });
+    if (!Array.isArray(data)) { setSyncBadge('error'); return false; }
+    if (data.length > 0) {
+      txs = data.map(r => ({
+        id:+r.id, date:String(r.date), amount:+r.amount,
+        description:String(r.description||''), type:String(r.type),
+        category:String(r.category), notes:String(r.notes||'')
+      }));
+      nextId = Math.max(...txs.map(t=>t.id)) + 1;
+      save();
+    } else {
+      // Sheet empty → seed it with current data
+      await seedSheets();
+    }
+    setSyncBadge('ok');
+    return true;
+  } catch(e) {
+    console.error('loadFromSheets:', e);
+    setSyncBadge('error');
+    return false;
+  }
+}
+
+async function seedSheets() {
+  setSyncBadge('syncing', 'Inicializando Sheets...');
+  await sheetCall({ action:'clear' });
+  const sz = 8;
+  for (let i = 0; i < txs.length; i += sz) {
+    const batch = txs.slice(i, i+sz);
+    await sheetCall({ action:'add_batch', batch });
+    setSyncBadge('syncing', `Cargando ${Math.min(i+sz,txs.length)}/${txs.length}...`);
+  }
+}
+
+async function syncOp(op, data) {
+  if (!syncUrl) return;
+  try {
+    setSyncBadge('syncing', 'Guardando...');
+    const r = await sheetCall({ action:op, ...data });
+    setSyncBadge(r && r.ok ? 'ok' : 'error');
+  } catch(e) {
+    console.error('syncOp:', e);
+    setSyncBadge('error');
+  }
+}
+
+async function syncNow() {
+  toast('🔄 Recargando desde Sheets...');
+  const ok = await loadFromSheets();
+  if (ok) { refresh(); toast('✅ Datos actualizados desde Sheets'); }
+  else toast('❌ No se pudo conectar con Sheets');
+}
+
+// ════════════════════════════════════
+//  SETUP MODAL
+// ════════════════════════════════════
+function openSetup() {
+  document.getElementById('sync-url-input').value = syncUrl;
+  document.getElementById('sync-result').className = 'sync-result';
+  document.getElementById('setup-overlay').classList.add('open');
+}
+function closeSetup() { document.getElementById('setup-overlay').classList.remove('open'); }
+function closeSetupOnOverlay(e) { if(e.target.id==='setup-overlay') closeSetup(); }
+
+function copyCode() {
+  const code = document.getElementById('apps-script-code').textContent;
+  navigator.clipboard.writeText(code).then(()=>toast('📋 Código copiado')).catch(()=>{
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = code; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); toast('📋 Código copiado');
+  });
+}
+
+async function connectSheets() {
+  const url = document.getElementById('sync-url-input').value.trim();
+  const resEl = document.getElementById('sync-result');
+  const btn = document.getElementById('connect-btn');
+  if (!url || !url.startsWith('https://script.google.com')) {
+    resEl.className = 'sync-result error';
+    resEl.textContent = '⚠️ Ingresa una URL válida de Google Apps Script.';
+    return;
+  }
+  btn.textContent = '⏳ Conectando...';
+  btn.disabled = true;
+  resEl.className = 'sync-result';
+  try {
+    const testUrl = url + '?data=' + encodeURIComponent(JSON.stringify({action:'read'})) + '&t=' + Date.now();
+    const res = await fetch(testUrl, { redirect:'follow' });
+    const data = await res.json();
+    if (!Array.isArray(data) && !data.error) throw new Error('Respuesta inesperada');
+    // Connection OK
+    syncUrl = url;
+    localStorage.setItem('zelle_sync_url', syncUrl);
+    if (data.length > 0) {
+      resEl.className = 'sync-result ok';
+      resEl.textContent = `✅ Conectado. Se encontraron ${data.length} transacciones en Sheets. Cargando datos...`;
+      // Load from sheets
+      txs = data.map(r => ({
+        id:+r.id, date:String(r.date), amount:+r.amount,
+        description:String(r.description||''), type:String(r.type),
+        category:String(r.category), notes:String(r.notes||'')
+      }));
+      nextId = Math.max(...txs.map(t=>t.id)) + 1;
+      save();
+      setSyncBadge('ok');
+    } else {
+      resEl.className = 'sync-result ok';
+      resEl.textContent = '✅ Conectado. Hoja vacía. Subiendo transacciones locales...';
+      setSyncBadge('syncing', 'Subiendo datos...');
+      await seedSheets();
+      setSyncBadge('ok');
+      resEl.textContent = `✅ Conectado y sincronizado. ${txs.length} transacciones subidas a Sheets.`;
+    }
+    setTimeout(()=>{ closeSetup(); refresh(); toast('🟢 Sheets sincronizado correctamente'); }, 1500);
+  } catch(e) {
+    console.error(e);
+    resEl.className = 'sync-result error';
+    resEl.textContent = '❌ No se pudo conectar. Verifica que la URL sea correcta y que la implementación sea "Cualquier persona".';
+  } finally {
+    btn.textContent = '🔗 Conectar y Sincronizar';
+    btn.disabled = false;
+  }
+}
+
+// ════════════════════════════════════
+//  VIEWS
+// ════════════════════════════════════
+function showView(view) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById(`view-${view}`).classList.add('active');
+  document.querySelector(`.nav-item[onclick="showView('${view}')"]`).classList.add('active');
+  currentView = view;
+  const titles = {dashboard:'Dashboard',monthly:'Transacciones por Mes',history:'Historial Completo',balance:'Balance & Resumen'};
+  document.getElementById('page-title').textContent = titles[view];
+  if(view==='dashboard') renderDash();
+  if(view==='monthly')   renderMonthly();
+  if(view==='history')   renderHistory();
+  if(view==='balance')   renderBalance();
+}
+function refresh() {
+  if(currentView==='dashboard') renderDash();
+  if(currentView==='monthly')   renderMonthly();
+  if(currentView==='history')   renderHistory();
+  if(currentView==='balance')   renderBalance();
+}
+
+// ════════════════════════════════════
+//  DASHBOARD
+// ════════════════════════════════════
+function renderDash() {
+  const inc = txs.filter(t=>t.type==='income').reduce((s,t)=>s+Math.abs(t.amount),0);
+  const exp = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+Math.abs(t.amount),0);
+  const bal = inc - exp;
+  const cur = monthStats(5);
+  document.getElementById('summary-cards').innerHTML = `
+    <div class="card"><div class="card-icon">💹</div><div class="card-label">Total Ingresos</div><div class="card-value income">$${inc.toFixed(2)}</div><div class="card-sub">Enero – Junio 2026</div></div>
+    <div class="card"><div class="card-icon">💸</div><div class="card-label">Total Gastos</div><div class="card-value expense">$${exp.toFixed(2)}</div><div class="card-sub">Enero – Junio 2026</div></div>
+    <div class="card"><div class="card-icon">⚖️</div><div class="card-label">Balance Neto</div><div class="card-value ${bal>=0?'income':'expense'}">$${bal.toFixed(2)}</div><div class="card-sub">${bal>=0?'✅ Positivo':'⚠️ Negativo'}</div></div>
+    <div class="card"><div class="card-icon">📆</div><div class="card-label">Junio (Actual)</div><div class="card-value ${cur.net>=0?'income':'expense'}">$${cur.net.toFixed(2)}</div><div class="card-sub">${cur.count} movimientos</div></div>`;
+  renderBarChart(); renderPieChart();
+  const recent = [...txs].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,8);
+  document.getElementById('recent-tbody').innerHTML = recent.map(t=>`
+    <tr><td>${fmtDate(t.date)}</td><td>${descCell(t)}</td><td><span class="cat-chip">${CAT[t.category]||t.category}</span></td>
+    <td><span class="badge badge-${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
+    <td class="amount-${t.type}">${fmtAbs(t.amount)}</td></tr>`).join('') ||
+    `<tr class="empty-row"><td colspan="5">Sin datos</td></tr>`;
+}
+function renderBarChart() {
+  const ctx = document.getElementById('barChart').getContext('2d');
+  if(charts.bar) charts.bar.destroy();
+  charts.bar = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:MONTHS, datasets:[
+      {label:'Ingresos',data:MONTHS.map((_,i)=>monthStats(i).inc),backgroundColor:'rgba(5,150,105,.75)',borderRadius:5,borderSkipped:false},
+      {label:'Gastos',  data:MONTHS.map((_,i)=>monthStats(i).exp),backgroundColor:'rgba(220,38,38,.75)', borderRadius:5,borderSkipped:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},
+      scales:{y:{ticks:{callback:v=>'$'+v,font:{size:10}},grid:{color:'#f0f4f8'}},x:{ticks:{font:{size:11}},grid:{display:false}}}}
+  });
+}
+function renderPieChart() {
+  const ctx = document.getElementById('pieChart').getContext('2d');
+  if(charts.pie) charts.pie.destroy();
+  const cats = {};
+  txs.filter(t=>t.type==='expense').forEach(t=>{ cats[t.category]=(cats[t.category]||0)+Math.abs(t.amount); });
+  charts.pie = new Chart(ctx, {
+    type:'doughnut',
+    data:{labels:Object.keys(cats).map(k=>CAT[k]||k),datasets:[{data:Object.values(cats),backgroundColor:['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899','#06b6d4','#14b8a6'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12,padding:8}}}}
+  });
+}
+
+// ════════════════════════════════════
+//  MONTHLY
+// ════════════════════════════════════
+function renderMonthly() {
+  document.getElementById('month-tabs').innerHTML = MONTHS.map((m,i)=>
+    `<button class="month-tab ${i===currentMonth?'active':''}" onclick="setMonth(${i})">${m}</button>`).join('');
+  document.getElementById('monthly-title').textContent = `${MONTHS[currentMonth]} 2026`;
+  let ms = txs.filter(t=>getMonthIdx(t.date)===currentMonth);
+  if(monthFilter==='income')  ms = ms.filter(t=>t.type==='income');
+  if(monthFilter==='expense') ms = ms.filter(t=>t.type==='expense');
+  ms.sort((a,b)=>new Date(a.date)-new Date(b.date));
+  document.getElementById('monthly-tbody').innerHTML = ms.map(t=>`
+    <tr>
+      <td style="font-weight:600">${parseInt(t.date.split('-')[2])}</td>
+      <td>${descCell(t)}</td>
+      <td><span class="cat-chip">${CAT[t.category]||t.category}</span></td>
+      <td><span class="badge badge-${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
+      <td class="amount-${t.type}">${fmtAbs(t.amount)}</td>
+      <td>${actionBtns(t.id)}</td>
+    </tr>`).join('') || `<tr class="empty-row"><td colspan="6">Sin transacciones para este mes</td></tr>`;
+  const s = monthStats(currentMonth);
+  document.getElementById('monthly-summary').innerHTML = `
+    <span>✅ Ingresos: <strong style="color:var(--income)">$${s.inc.toFixed(2)}</strong></span>
+    <span>❌ Gastos: <strong style="color:var(--expense)">$${s.exp.toFixed(2)}</strong></span>
+    <span>💰 Neto: <strong style="color:${s.net>=0?'var(--income)':'var(--expense)'}">$${s.net.toFixed(2)}</strong></span>
+    <span style="margin-left:auto;color:var(--text-secondary);font-size:12px">${ms.length} de ${s.count} entradas</span>`;
+}
+function setMonth(i) { currentMonth=i; renderMonthly(); }
+function setMonthFilter(f,btn) {
+  monthFilter=f;
+  document.querySelectorAll('#view-monthly .filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active'); renderMonthly();
+}
+
+// ════════════════════════════════════
+//  HISTORY
+// ════════════════════════════════════
+function renderHistory() {
+  const q  = document.getElementById('search-input').value.toLowerCase();
+  const mf = document.getElementById('filter-month').value;
+  const cf = document.getElementById('filter-cat').value;
+  const tf = document.getElementById('filter-type').value;
+  let res = [...txs];
+  if(q)  res=res.filter(t=>(t.description+' '+t.notes).toLowerCase().includes(q));
+  if(mf) res=res.filter(t=>MONTHS[getMonthIdx(t.date)]===mf);
+  if(cf) res=res.filter(t=>t.category===cf);
+  if(tf) res=res.filter(t=>t.type===tf);
+  res.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  document.getElementById('history-count').textContent = `${res.length} resultado${res.length!==1?'s':''}`;
+  document.getElementById('history-tbody').innerHTML = res.map(t=>`
+    <tr>
+      <td>${fmtDate(t.date)}</td><td>${descCell(t)}</td>
+      <td><span class="cat-chip">${CAT[t.category]||t.category}</span></td>
+      <td><span class="badge badge-${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
+      <td class="amount-${t.type}">${fmtAbs(t.amount)}</td>
+      <td>${actionBtns(t.id)}</td>
+    </tr>`).join('') || `<tr class="empty-row"><td colspan="6">No se encontraron resultados</td></tr>`;
+}
+
+// ════════════════════════════════════
+//  BALANCE
+// ════════════════════════════════════
+function renderBalance() {
+  let cum=0;
+  const rows = MONTHS.map((m,i)=>{ const s=monthStats(i); cum+=s.net; return {month:m,...s,cum}; });
+  const tInc=rows.reduce((s,r)=>s+r.inc,0), tExp=rows.reduce((s,r)=>s+r.exp,0), fin=rows[5].cum;
+  document.getElementById('balance-cards').innerHTML = `
+    <div class="card"><div class="card-icon">💹</div><div class="card-label">Total Ingresos</div><div class="card-value income">$${tInc.toFixed(2)}</div><div class="card-sub">Ene – Jun 2026</div></div>
+    <div class="card"><div class="card-icon">💸</div><div class="card-label">Total Gastos</div><div class="card-value expense">$${tExp.toFixed(2)}</div><div class="card-sub">Ene – Jun 2026</div></div>
+    <div class="card"><div class="card-icon">${fin>=0?'🟢':'🔴'}</div><div class="card-label">Balance Final</div><div class="card-value ${fin>=0?'income':'expense'}">$${fin.toFixed(2)}</div><div class="card-sub">${fin>=0?'Saldo positivo ✅':'Saldo negativo ⚠️'}</div></div>`;
+  const ctx = document.getElementById('lineChart').getContext('2d');
+  if(charts.line) charts.line.destroy();
+  charts.line = new Chart(ctx, {
+    type:'line',
+    data:{ labels:MONTHS, datasets:[
+      {label:'Balance Acumulado',data:rows.map(r=>r.cum),borderColor:'#1a56db',backgroundColor:'rgba(26,86,219,.07)',fill:true,tension:.4,pointBackgroundColor:rows.map(r=>r.cum>=0?'#059669':'#dc2626'),pointRadius:5},
+      {label:'Neto del Mes',data:rows.map(r=>r.net),borderColor:'#8b5cf6',backgroundColor:'rgba(139,92,246,.05)',fill:false,tension:.4,borderDash:[5,4],pointRadius:4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},
+      scales:{y:{ticks:{callback:v=>'$'+v,font:{size:10}},grid:{color:'#f0f4f8'}},x:{ticks:{font:{size:11}},grid:{display:false}}}}
+  });
+  document.getElementById('balance-tbody').innerHTML = rows.map(r=>`
+    <tr><td><strong>${r.month}</strong></td>
+    <td class="amount-income">+$${r.inc.toFixed(2)}</td>
+    <td class="amount-expense">-$${r.exp.toFixed(2)}</td>
+    <td class="${r.net>=0?'amount-income':'amount-expense'}">${r.net>=0?'+':'-'}$${Math.abs(r.net).toFixed(2)}</td>
+    <td class="${r.cum>=0?'balance-pos':'balance-neg'}">$${r.cum.toFixed(2)}</td></tr>`).join('');
+}
+
+// ════════════════════════════════════
+//  MODAL / CRUD
+// ════════════════════════════════════
+function openModal() {
+  editingId=null; txType='income';
+  document.getElementById('modal-title').textContent='Nueva Transacción';
+  document.getElementById('btn-income').classList.add('active');
+  document.getElementById('btn-expense').classList.remove('active');
+  document.getElementById('input-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('input-amount').value='';
+  document.getElementById('input-desc').value='';
+  document.getElementById('input-cat').value='cobros';
+  document.getElementById('input-notes').value='';
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('input-amount').focus(),100);
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+function closeModalOnOverlay(e) { if(e.target.id==='modal-overlay') closeModal(); }
+function setType(t) {
+  txType=t;
+  document.getElementById('btn-income').classList.toggle('active',t==='income');
+  document.getElementById('btn-expense').classList.toggle('active',t==='expense');
+  const cat=document.getElementById('input-cat');
+  if(t==='expense'&&['salario','trabajo','cobros'].includes(cat.value)) cat.value='ventas';
+  if(t==='income'&&['ventas','pagos','envios','compras','prestamos'].includes(cat.value)) cat.value='cobros';
+}
+function editTx(id) {
+  const t=txs.find(t=>t.id===id); if(!t) return;
+  editingId=id; txType=t.type;
+  document.getElementById('modal-title').textContent='Editar Transacción';
+  document.getElementById('btn-income').classList.toggle('active',t.type==='income');
+  document.getElementById('btn-expense').classList.toggle('active',t.type==='expense');
+  document.getElementById('input-date').value=t.date;
+  document.getElementById('input-amount').value=Math.abs(t.amount);
+  document.getElementById('input-desc').value=t.description;
+  document.getElementById('input-cat').value=t.category;
+  document.getElementById('input-notes').value=t.notes;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+async function deleteTx(id) {
+  if(!confirm('¿Eliminar esta transacción?')) return;
+  txs=txs.filter(t=>t.id!==id);
+  save(); refresh(); toast('🗑️ Transacción eliminada');
+  syncOp('delete', { id });
+}
+async function saveTransaction() {
+  const date=document.getElementById('input-date').value;
+  const raw=parseFloat(document.getElementById('input-amount').value);
+  const description=document.getElementById('input-desc').value.trim();
+  const category=document.getElementById('input-cat').value;
+  const notes=document.getElementById('input-notes').value.trim();
+  if(!date||isNaN(raw)||raw<=0){ toast('⚠️ Ingresa fecha y monto válidos'); return; }
+  const amount=txType==='expense'?-Math.abs(raw):Math.abs(raw);
+  if(editingId) {
+    const i=txs.findIndex(t=>t.id===editingId);
+    txs[i]={id:editingId,date,amount,description,type:txType,category,notes};
+    save(); closeModal(); refresh(); toast('✅ Transacción actualizada');
+    syncOp('update', { tx:txs[txs.findIndex(t=>t.id===editingId)] });
+    // re-read the updated tx
+    syncOp('update', { tx:{id:editingId,date,amount,description,type:txType,category,notes} });
+  } else {
+    const newTx={id:nextId++,date,amount,description,type:txType,category,notes};
+    txs.push(newTx);
+    save(); closeModal(); refresh(); toast('✅ Transacción agregada');
+    syncOp('add', { tx:newTx });
+  }
+}
+
+// ════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════
+function toast(msg) {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+// ════════════════════════════════════
+//  INIT
+// ════════════════════════════════════
+(async function init() {
+  if(syncUrl) {
+    setSyncBadge('syncing','Cargando...');
+    const ok = await loadFromSheets();
+    if(!ok) setSyncBadge('error');
+  } else {
+    setSyncBadge('none');
+  }
+  renderDash();
+})();
+</script>
+</body>
+</html>

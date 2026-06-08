@@ -499,6 +499,7 @@
     .balance-timeline canvas{max-height:170px}
 
     /* ── Fix: Dashboard recent-tbody (5 cols, sin acciones)     */
+    /* td:last-child genérico pone el monto en position:absolute */
     #recent-tbody tr td:last-child{
       position:static!important;
       display:block!important;width:100%;
@@ -506,6 +507,7 @@
     }
 
     /* ── Fix: Balance-tbody (cols: mes / inc / exp / net / cum) */
+    /* El layout genérico asume 6 cols; aquí son 5 con distinta semántica */
     #balance-tbody tr td:nth-child(1){
       position:static!important;
       display:block!important;width:100%;
@@ -721,7 +723,7 @@
       <div class="cards" id="dash-cards"></div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos por mes</h3><canvas id="chart-monthly"></canvas></div>
-        <div class="chart-box"><h3>Gastos por categoría</h3><canvas id="chart-cat"></canvas></div>
+        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="chart-cat"></canvas></div>
       </div>
       <div class="tbl-wrap">
         <div class="tbl-header"><h3>Últimas transacciones</h3></div>
@@ -1202,6 +1204,22 @@
   </div>
 </div>
 
+<!-- Modal: Colores de categorías -->
+<div class="modal-overlay" id="catcolors-modal">
+  <div class="modal" style="width:420px;max-width:98vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <h3 style="margin:0">🎨 Colores del gráfico</h3>
+      <button class="btn btn-ghost" onclick="closeCatColorsModal()" style="padding:4px 10px;font-size:1.1rem">✕</button>
+    </div>
+    <p style="font-size:.78rem;color:var(--text2);margin:0 0 14px">Personaliza el color de cada categoría en el gráfico de gastos.</p>
+    <div id="catcolors-body" style="max-height:380px;overflow-y:auto"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeCatColorsModal()">Cerrar</button>
+      <button class="btn btn-primary" onclick="Object.keys(catColors).length&&(renderChartCat(),scheduleSave()); closeCatColorsModal();">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- BOTTOM NAV (mobile only) -->
@@ -1332,6 +1350,8 @@ let homeTxs = [];
 // ---- Auth & custom menus ----
 let users = [];        // [{id, name, password, role}]
 let customMenus = [];  // [{id, name, icon, currency, pin, access, catsInc, catsExp, data, nextId, charts}]
+const DEFAULT_CAT_COLORS = ['#3b82f6','#ef4444','#f59e0b','#22c55e','#8b5cf6','#06b6d4','#ec4899','#f97316'];
+let catColors = {};  // {categoryKey: '#hexcolor'}
 let currentUser = null; // usuario logueado
 let nextUserId = 1;
 let nextMenuId = 1;
@@ -1417,6 +1437,7 @@ function initFromDrive(data) {
     if (c.homeCatsInc) HOME_CATS_INC  = c.homeCatsInc;
     if (c.homeCatsExp) HOME_CATS_EXP  = c.homeCatsExp;
     if (c.homeCurr)    HOME_CURR      = c.homeCurr;
+    if (c.catColors)   catColors      = c.catColors;
     rebuildHomeCatsAll();
     if (c.users && c.users.length)        { users = c.users; nextUserId = Math.max(...users.map(u=>u.id))+1; }
     if (c.customMenus && c.customMenus.length) {
@@ -1431,7 +1452,7 @@ function initFromDrive(data) {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
       config:{catAll:CAT_ALL,homeCatsInc:HOME_CATS_INC,homeCatsExp:HOME_CATS_EXP,
-              homeCurr:HOME_CURR,users:users,customMenus:customMenus}
+              homeCurr:HOME_CURR,users:users,customMenus:customMenus,catColors:catColors}
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
@@ -1457,7 +1478,7 @@ function pushToDrive() {
     lastUpdated: new Date().toISOString(),
     config: {
       catAll:CAT_ALL, homeCatsInc:HOME_CATS_INC, homeCatsExp:HOME_CATS_EXP,
-      homeCurr:HOME_CURR, users:users, customMenus:menusPayload
+      homeCurr:HOME_CURR, users:users, customMenus:menusPayload, catColors:catColors
     },
     transactions:txs, deudas:deudas, home:homeTxs
   };
@@ -1662,13 +1683,17 @@ function renderChartMonthly() {
   });
 }
 
+function getCatColor(key, idx) {
+  return catColors[key] || DEFAULT_CAT_COLORS[idx % DEFAULT_CAT_COLORS.length];
+}
+
 function renderChartCat() {
   const cats = {};
   txs.filter(t=>t.type==='expense').forEach(t=>{
     cats[t.category] = (cats[t.category]||0) + t.amount;
   });
   const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const colors = ['#3b82f6','#ef4444','#f59e0b','#22c55e','#8b5cf6','#06b6d4','#ec4899','#f97316'];
+  const colors = sorted.map(([key], i) => getCatColor(key, i));
   const ctx = document.getElementById('chart-cat').getContext('2d');
   if (chartCat) chartCat.destroy();
   chartCat = new Chart(ctx, {
@@ -1676,6 +1701,41 @@ function renderChartCat() {
     data:{labels:sorted.map(([c])=>catLabel(c)),datasets:[{data:sorted.map(([,v])=>v),backgroundColor:colors,borderWidth:2,borderColor:'#1e293b'}]},
     options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}}}}
   });
+}
+
+function openCatColorsModal() {
+  // Recoger categorías con gastos, ordenadas por monto
+  const cats = {};
+  txs.filter(t=>t.type==='expense').forEach(t=>{
+    cats[t.category] = (cats[t.category]||0) + t.amount;
+  });
+  const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  const rows = sorted.map(([key, amt], i) => {
+    const color = getCatColor(key, i);
+    const label = catLabel(key);
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <input type="color" value="${color}" data-key="${key}"
+          oninput="catColors['${key}']=this.value; renderChartCat();"
+          onchange="scheduleSave();"
+          style="width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:6px;padding:0">
+        <span style="flex:1;font-size:.88rem">${label}</span>
+        <span style="font-size:.75rem;color:var(--text2)">${fmt(amt)}</span>
+        <button onclick="delete catColors['${key}']; document.querySelector('input[data-key=\\'${key}\\']').value='${DEFAULT_CAT_COLORS[i%DEFAULT_CAT_COLORS.length]}'; renderChartCat(); scheduleSave();"
+          title="Restablecer" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.8rem;padding:2px 6px">↺</button>
+      </div>`;
+  }).join('');
+
+  const body = document.getElementById('catcolors-body');
+  if (body) {
+    body.innerHTML = rows;
+    document.getElementById('catcolors-modal').classList.add('open');
+  }
+}
+
+function closeCatColorsModal() {
+  document.getElementById('catcolors-modal').classList.remove('open');
 }
 
 // ============================================================

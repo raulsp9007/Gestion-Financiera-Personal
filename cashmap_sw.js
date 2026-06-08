@@ -1,5 +1,5 @@
 /**
- * CashMap — Service Worker v1.1
+ * CashMap — Service Worker
  * Para deploy en servidor propio (GitHub Pages, Netlify, etc.)
  * Coloca este archivo en la misma carpeta que index.html
  */
