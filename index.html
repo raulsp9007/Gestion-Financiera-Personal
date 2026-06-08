@@ -12,6 +12,8 @@
 <meta name="apple-mobile-web-app-title" content="CashMap">
 <meta name="application-name" content="CashMap">
 <meta name="description" content="Gestión financiera personal — transacciones, deudas, hogar">
+<!-- Favicon emoji 💰 -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
 <!-- El manifest se inyecta dinámicamente por JS para compatibilidad con Apps Script -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
@@ -381,29 +383,29 @@
       background:var(--bg3);padding:2px 7px;
       border-radius:99px;display:block;
     }
-    /* Descripción → fila completa, bold */
+    /* Monto → grande, bold, primera línea visible */
     .tbl-scroll td:nth-child(2){
       display:block;width:100%;
-      font-weight:600;font-size:.88rem;
+      font-size:1.05rem;font-weight:800;
       padding-right:64px; /* espacio para la fecha */
-      margin-bottom:6px;
+      margin-bottom:4px;
     }
-    /* Categoría → badge izquierda */
+    /* Descripción → fila completa, bold secundario */
     .tbl-scroll td:nth-child(3){
+      display:block;width:100%;
+      font-weight:600;font-size:.86rem;
+      margin-bottom:4px;
+    }
+    /* Tipo (badge) → inline */
+    .tbl-scroll td:nth-child(4){display:inline-block;margin-left:0}
+    .tbl-scroll td:nth-child(4) .badge{font-size:.68rem;padding:2px 8px}
+    /* Categoría → badge inline a la derecha del tipo */
+    .tbl-scroll td:nth-child(5){
       font-size:.7rem;
       background:var(--bg3);
       padding:2px 8px;border-radius:99px;
       display:inline-block;
-      color:var(--text2);
-    }
-    /* Tipo (badge) → inline */
-    .tbl-scroll td:nth-child(4){display:inline-block;margin-left:4px}
-    .tbl-scroll td:nth-child(4) .badge{font-size:.68rem;padding:2px 8px}
-    /* Monto → derecha de la segunda fila */
-    .tbl-scroll td:nth-child(5){
-      display:block;width:100%;
-      font-size:1rem;font-weight:800;
-      margin-top:6px;
+      color:var(--text2);margin-left:4px;
     }
     /* Notas → texto pequeño debajo */
     .tbl-scroll td:nth-child(6){
@@ -498,14 +500,32 @@
     /* ── Balance chart ───────────────────────────────────────── */
     .balance-timeline canvas{max-height:170px}
 
-    /* ── Fix: Dashboard recent-tbody (5 cols, sin acciones)     */
+    /* ── Fix: recent-tbody (5 cols: Fecha/Monto/Desc/Tipo/Categoría) */
+    /* Col 5 (Categoría) es td:last-child → el genérico la posiciona  */
+    /* absolute con font grande. Restaurar como badge inline pequeño.  */
     #recent-tbody tr td:last-child{
       position:static!important;
-      display:block!important;width:100%;
-      font-size:1rem;font-weight:800;margin-top:6px;
+      display:inline-block!important;
+      width:auto!important;
+      font-size:.7rem!important;font-weight:400!important;
+      background:var(--bg3)!important;
+      padding:2px 8px!important;border-radius:99px!important;
+      color:var(--text2)!important;
+      margin-left:4px!important;margin-top:0!important;
+    }
+
+    /* ── Fix: cm-tbody (6 cols: Fecha/Monto/Desc/Tipo/Notas/Acc) */
+    /* Col 5 es Notas (texto), no Categoría → quitar badge styling */
+    [id^="cm-tbody-"] tr td:nth-child(5){
+      background:transparent!important;
+      padding:0!important;border-radius:0!important;
+      display:block!important;width:100%!important;
+      font-size:.72rem!important;color:var(--text2)!important;
+      margin-left:0!important;margin-top:2px!important;
     }
 
     /* ── Fix: Balance-tbody (cols: mes / inc / exp / net / cum) */
+    /* El layout genérico asume 6 cols; aquí son 5 con distinta semántica */
     #balance-tbody tr td:nth-child(1){
       position:static!important;
       display:block!important;width:100%;
@@ -676,7 +696,6 @@
     <a class="active" data-view="view-dashboard" onclick="switchView(this)"><span class="ico">📊</span> Dashboard</a>
     <a data-view="view-monthly" onclick="switchView(this)"><span class="ico">📅</span> Por Mes</a>
     <a data-view="view-history" onclick="switchView(this)"><span class="ico">📋</span> Historial</a>
-    <a data-view="view-balance" onclick="switchView(this)"><span class="ico">📈</span> Balance</a>
     <a data-view="view-deudas" onclick="switchView(this)"><span class="ico">💳</span> Deudas</a>
     <a data-view="view-home" onclick="switchView(this)"><span class="ico">🏠</span> Home Billings</a>
     <!-- Menús personalizados — inyectados dinámicamente por JS -->
@@ -721,11 +740,11 @@
       <div class="cards" id="dash-cards"></div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos por mes</h3><canvas id="chart-monthly"></canvas></div>
-        <div class="chart-box"><h3>Gastos por categoría</h3><canvas id="chart-cat"></canvas></div>
+        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="chart-cat"></canvas></div>
       </div>
       <div class="tbl-wrap">
         <div class="tbl-header"><h3>Últimas transacciones</h3></div>
-        <div class="tbl-scroll"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Monto</th></tr></thead>
+        <div class="tbl-scroll"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Descripción</th><th>Tipo</th><th>Categoría</th></tr></thead>
         <tbody id="recent-tbody"></tbody></table></div>
       </div>
     </div>
@@ -739,7 +758,7 @@
           <h3 id="month-tbl-title">Transacciones</h3>
           <button class="btn btn-primary btn-sm" onclick="openTxModal()">+ Agregar transacción</button>
         </div>
-        <div class="tbl-scroll"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Monto</th><th>Acciones</th></tr></thead>
+        <div class="tbl-scroll"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Descripción</th><th>Tipo</th><th>Categoría</th><th>Acciones</th></tr></thead>
         <tbody id="month-tbody"></tbody></table></div>
       </div>
     </div>
@@ -776,7 +795,7 @@
           <h3>Historial completo</h3>
           <span id="hist-count" style="font-size:.78rem;color:var(--text2)"></span>
         </div>
-        <div class="tbl-scroll"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Monto</th><th>Notas</th><th>Acciones</th></tr></thead>
+        <div class="tbl-scroll"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Descripción</th><th>Tipo</th><th>Categoría</th><th>Notas</th><th>Acciones</th></tr></thead>
         <tbody id="hist-tbody"></tbody></table></div>
       </div>
     </div>
@@ -835,7 +854,7 @@
       <div class="cards" id="home-cards"></div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos (hogar)</h3><canvas id="chart-home-monthly"></canvas></div>
-        <div class="chart-box"><h3>Gastos por categoría</h3><canvas id="chart-home-cat"></canvas></div>
+        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal('home')" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="chart-home-cat"></canvas></div>
       </div>
       <button class="filter-toggle-btn" onclick="toggleFilters('home-filters','hf-search','hf-type','hf-cat','hf-month')">
         🔍 Buscar y filtrar
@@ -868,7 +887,7 @@
           <span id="home-count" style="font-size:.78rem;color:var(--text2)"></span>
         </div>
         <div class="tbl-scroll"><table><thead><tr>
-          <th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Monto</th><th>Notas</th><th>Acciones</th>
+          <th>Fecha</th><th>Monto</th><th>Descripción</th><th>Tipo</th><th>Categoría</th><th>Notas</th><th>Acciones</th>
         </tr></thead>
         <tbody id="home-tbody"></tbody></table></div>
       </div>
@@ -994,7 +1013,14 @@
       </div>
       <div class="form-row">
         <label>Categoría</label>
-        <select id="tx-cat"></select>
+        <select id="tx-cat" onchange="updateTxColorPicker()"></select>
+      </div>
+    </div>
+    <div class="form-row" id="tx-color-row" style="display:none">
+      <label>Color en gráfico</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="color" id="tx-cat-color" style="width:40px;height:36px;border:1px solid var(--border);border-radius:8px;padding:2px;background:var(--bg);cursor:pointer">
+        <span style="font-size:.78rem;color:var(--text2)">Color del pastel para esta categoría</span>
       </div>
     </div>
     <div class="form-row">
@@ -1038,7 +1064,14 @@
       </div>
       <div class="form-row">
         <label>Categoría</label>
-        <select id="home-tx-cat"></select>
+        <select id="home-tx-cat" onchange="updateHomeTxColorPicker()"></select>
+      </div>
+    </div>
+    <div class="form-row" id="home-color-row" style="display:none">
+      <label>Color en gráfico</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="color" id="home-cat-color" style="width:40px;height:36px;border:1px solid var(--border);border-radius:8px;padding:2px;background:var(--bg);cursor:pointer">
+        <span style="font-size:.78rem;color:var(--text2)">Color del pastel para esta categoría</span>
       </div>
     </div>
     <div class="form-row">
@@ -1098,10 +1131,28 @@
       <div id="menus-list" style="max-height:220px;overflow-y:auto;margin-bottom:14px"></div>
       <div style="background:var(--bg3);border-radius:10px;padding:14px" id="menu-form-wrap">
         <div style="font-size:.8rem;font-weight:600;color:var(--text2);margin-bottom:10px" id="menu-form-title">+ Nuevo menú</div>
-        <div style="display:grid;grid-template-columns:60px 1fr 110px;gap:8px">
+        <div style="display:grid;grid-template-columns:60px 1fr;gap:8px">
           <div class="form-row" style="margin:0"><label style="font-size:.74rem">Icono</label><input type="text" id="mf-icon" placeholder="📊" style="text-align:center;font-size:1.2rem"></div>
           <div class="form-row" style="margin:0"><label style="font-size:.74rem">Nombre del menú</label><input type="text" id="mf-name" placeholder="Ej: Ahorros, Negocio..."></div>
-          <div class="form-row" style="margin:0"><label style="font-size:.74rem">Moneda</label><input type="text" id="mf-curr" placeholder="$, L, €..." style="text-align:center"></div>
+        </div>
+        <div class="form-row" style="margin:8px 0 0">
+          <label style="font-size:.74rem">Moneda</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="mf-curr-sel" onchange="updateMenuCurrField(this.value)" style="flex:1">
+              <option value="$">🇺🇸 USD — $</option>
+              <option value="€">🇪🇺 EUR — €</option>
+              <option value="L">🇭🇳 HNL — L</option>
+              <option value="RD$">🇩🇴 DOP — RD$</option>
+              <option value="MXN$">🇲🇽 MXN — MXN$</option>
+              <option value="£">🇬🇧 GBP — £</option>
+              <option value="COP$">🇨🇴 COP — COP$</option>
+              <option value="Q">🇬🇹 GTQ — Q</option>
+              <option value="₡">🇨🇷 CRC — ₡</option>
+              <option value="custom">✏️ Otra moneda...</option>
+            </select>
+            <input type="text" id="mf-curr" placeholder="símbolo..." maxlength="6"
+              style="width:80px;display:none;text-align:center" oninput="this.value=this.value.toUpperCase()">
+          </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
           <div class="form-row" style="margin:0">
@@ -1156,28 +1207,32 @@
 
     <!-- Tabs -->
     <div id="cats-tabs" style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap">
-      <button class="cats-tab active" data-tab="zelle" onclick="switchCatsTab('zelle')">💱 Zelle</button>
-      <button class="cats-tab" data-tab="home-inc" onclick="switchCatsTab('home-inc')">🏠 Hogar Ingresos</button>
-      <button class="cats-tab" data-tab="home-exp" onclick="switchCatsTab('home-exp')">🏠 Hogar Gastos</button>
+      <button class="cats-tab active" data-tab="inc" onclick="switchCatsTab('inc')">💰 Ingresos</button>
+      <button class="cats-tab" data-tab="exp" onclick="switchCatsTab('exp')">💸 Gastos</button>
       <button class="cats-tab" data-tab="config" onclick="switchCatsTab('config')">🔧 Config</button>
     </div>
 
     <!-- Listas de categorías -->
-    <div id="cats-list-wrap" style="max-height:340px;overflow-y:auto;margin-bottom:14px">
+    <div id="cats-list-wrap" style="max-height:300px;overflow-y:auto;margin-bottom:14px">
       <div id="cats-list"></div>
     </div>
 
     <!-- Formulario agregar/editar -->
     <div id="cats-form" style="background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:14px">
       <div style="font-size:.8rem;font-weight:600;color:var(--text2);margin-bottom:10px" id="cats-form-title">+ Nueva categoría</div>
-      <div style="display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:end">
+      <div style="display:grid;grid-template-columns:90px 1fr 48px;gap:8px;align-items:end">
         <div class="form-row" style="margin:0">
-          <label style="font-size:.74rem">Emoji + clave</label>
-          <input type="text" id="cat-new-key" placeholder="clave_unica" style="font-size:.82rem">
+          <label style="font-size:.74rem">Clave única</label>
+          <input type="text" id="cat-new-key" placeholder="clave_id" style="font-size:.82rem">
         </div>
         <div class="form-row" style="margin:0">
           <label style="font-size:.74rem">Nombre visible</label>
           <input type="text" id="cat-new-label" placeholder="ej: 🍔 Comida rápida" style="font-size:.82rem">
+        </div>
+        <div class="form-row" style="margin:0">
+          <label style="font-size:.74rem">Color</label>
+          <input type="color" id="cat-new-color" value="#3b82f6"
+            style="width:40px;height:36px;border:none;background:none;cursor:pointer;border-radius:6px;padding:0">
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px">
@@ -1202,6 +1257,22 @@
   </div>
 </div>
 
+<!-- Modal: Colores de categorías -->
+<div class="modal-overlay" id="catcolors-modal">
+  <div class="modal" style="width:420px;max-width:98vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <h3 style="margin:0">🎨 Colores del gráfico</h3>
+      <button class="btn btn-ghost" onclick="closeCatColorsModal()" style="padding:4px 10px;font-size:1.1rem">✕</button>
+    </div>
+    <p style="font-size:.78rem;color:var(--text2);margin:0 0 14px">Personaliza el color de cada categoría en el gráfico de gastos.</p>
+    <div id="catcolors-body" style="max-height:380px;overflow-y:auto"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeCatColorsModal()">Cerrar</button>
+      <button class="btn btn-primary" onclick="(_catModalSource==='home'?renderHome():refreshAllCatCharts()); scheduleSave(); closeCatColorsModal();">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- BOTTOM NAV (mobile only) -->
@@ -1214,9 +1285,6 @@
   </a>
   <a data-view="view-history" onclick="switchView(this)">
     <span class="bn-ico">📋</span>Historial
-  </a>
-  <a data-view="view-balance" onclick="switchView(this)">
-    <span class="bn-ico">📈</span>Balance
   </a>
   <a data-view="view-deudas" onclick="switchView(this)">
     <span class="bn-ico">💳</span>Deudas
@@ -1269,58 +1337,61 @@ const MONTH_KEYS = ['01','02','03','04','05','06','07','08','09','10','11','12']
 // CATEGORÍAS — DINÁMICAS (editables desde el panel de config)
 // ============================================================
 // Zelle (USD) — ingresos y gastos compartidos en un solo objeto
-let CAT_ALL = {
-  ingresos:  '💰 Ingresos',
-  ventas:    '💱 Ventas',
-  envios:    '📦 Envíos',
-  compras:   '🛒 Compras',
-  prestamos: '🤝 Préstamos',
-  deuda:     '💳 Deuda',
-  servicios: '🔧 Servicios',
-  otros:     '📌 Otros'
+// ── Categorías globales — compartidas por todos los menús ────
+let globalCats = {
+  inc: {
+    ingresos:  { label: '💰 Ingresos generales', color: '#22c55e' },
+    ventas:    { label: '💱 Ventas', color: '#3b82f6' },
+    envios:    { label: '📦 Envíos recibidos', color: '#06b6d4' },
+    salario:   { label: '💼 Salario', color: '#8b5cf6' },
+    freelance: { label: '💻 Freelance/Extra', color: '#f59e0b' },
+    pension:   { label: '🏦 Pensión/Beneficio', color: '#ec4899' },
+    renta_inc: { label: '🏠 Renta recibida', color: '#f97316' },
+    bono:      { label: '🎁 Bono/Premio', color: '#a78bfa' },
+    otros_inc: { label: '📌 Otros ingresos', color: '#94a3b8' },
+  },
+  exp: {
+    compras:      { label: '🛒 Compras', color: '#ef4444' },
+    prestamos:    { label: '🤝 Préstamos', color: '#f59e0b' },
+    deuda:        { label: '💳 Deuda', color: '#f97316' },
+    servicios:    { label: '🔧 Servicios', color: '#3b82f6' },
+    otros:        { label: '📌 Otros', color: '#64748b' },
+    alquiler:     { label: '🏠 Alquiler/Renta', color: '#ea580c' },
+    internet:     { label: '📡 Internet/Teléfono', color: '#06b6d4' },
+    mercado:      { label: '🛒 Mercado/Despensa', color: '#16a34a' },
+    comida_fuera: { label: '🍽️ Comida fuera', color: '#ec4899' },
+    delivery:     { label: '🛵 Delivery', color: '#d97706' },
+    transporte:   { label: '🚗 Transporte', color: '#8b5cf6' },
+    salud:        { label: '🏥 Salud/Medicinas', color: '#dc2626' },
+    educacion:    { label: '📚 Educación', color: '#2563eb' },
+    entrete:      { label: '🎬 Entretenimiento', color: '#a78bfa' },
+    ropa:         { label: '👕 Ropa/Calzado', color: '#f97316' },
+    manten:       { label: '🔧 Mantenimiento', color: '#64748b' },
+    deudas_pago:  { label: '💳 Pago de deudas', color: '#ef4444' },
+    ahorro:       { label: '🏦 Ahorro', color: '#22c55e' },
+    otros_exp:    { label: '📌 Otros gastos', color: '#94a3b8' },
+  }
 };
+
+// Mapas de compatibilidad (usados por código legado — se reconstruyen desde globalCats)
+let CAT_ALL = {}, HOME_CATS_INC = {}, HOME_CATS_EXP = {}, HOME_CATS_ALL = {};
+function rebuildLegacyCatMaps() {
+  CAT_ALL = {}; HOME_CATS_INC = {}; HOME_CATS_EXP = {}; HOME_CATS_ALL = {};
+  Object.entries(globalCats.inc).forEach(([k,v])=>{ CAT_ALL[k]=v.label; HOME_CATS_INC[k]=v.label; HOME_CATS_ALL[k]=v.label; });
+  Object.entries(globalCats.exp).forEach(([k,v])=>{ CAT_ALL[k]=v.label; HOME_CATS_EXP[k]=v.label; HOME_CATS_ALL[k]=v.label; });
+}
+rebuildLegacyCatMaps();
+function rebuildHomeCatsAll() { rebuildLegacyCatMaps(); }
 
 // Home Billings — moneda local
 // Cambia HOME_CURR a tu moneda: 'RD$', 'MXN$', '€', '$', etc.
 let HOME_CURR = 'L ';
 
-let HOME_CATS_INC = {
-  salario:    '💼 Salario',
-  pension:    '🏦 Pensión/Beneficio',
-  freelance:  '💻 Freelance/Extra',
-  renta_inc:  '🏠 Renta recibida',
-  bono:       '🎁 Bono/Premio',
-  otros_inc:  '📌 Otros ingresos'
-};
-let HOME_CATS_EXP = {
-  alquiler:    '🏠 Alquiler/Renta',
-  servicios:   '💡 Servicios (luz/agua/gas)',
-  internet:    '📡 Internet/Teléfono',
-  mercado:     '🛒 Mercado/Despensa',
-  comida_fuera:'🍽️ Comida fuera/Restaurantes',
-  delivery:    '🛵 Delivery/Pedidos en línea',
-  comida_rap:  '🍔 Comida rápida',
-  transporte:  '🚗 Transporte',
-  salud:       '🏥 Salud/Medicinas',
-  educacion:   '📚 Educación',
-  entrete:     '🎬 Entretenimiento',
-  ropa:        '👕 Ropa/Calzado',
-  manten:      '🔧 Mantenimiento/Reparación',
-  deudas_pago: '💳 Pago de deudas',
-  ahorro:      '🏦 Ahorro',
-  otros_exp:   '📌 Otros gastos'
-};
-let HOME_CATS_ALL = { ...HOME_CATS_INC, ...HOME_CATS_EXP };
-
-function rebuildHomeCatsAll() {
-  HOME_CATS_ALL = { ...HOME_CATS_INC, ...HOME_CATS_EXP };
-}
-
 function fmtH(v) {
   return HOME_CURR + (v||0).toLocaleString('es', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
-function homeCatLabel(k) { return HOME_CATS_ALL[k] || k; }
-function catLabel(k)     { return CAT_ALL[k] || k; }
+function catLabel(k)     { return (globalCats.inc[k] || globalCats.exp[k])?.label || k; }
+function homeCatLabel(k) { return catLabel(k); }
 
 // ============================================================
 // DATOS — vacío (plantilla limpia)
@@ -1332,6 +1403,10 @@ let homeTxs = [];
 // ---- Auth & custom menus ----
 let users = [];        // [{id, name, password, role}]
 let customMenus = [];  // [{id, name, icon, currency, pin, access, catsInc, catsExp, data, nextId, charts}]
+const DEFAULT_CAT_COLORS = ['#3b82f6','#ef4444','#f59e0b','#22c55e','#8b5cf6','#06b6d4','#ec4899','#f97316'];
+let catColors = {};      // {categoryKey: '#hexcolor'} — Zelle + custom menus
+let homeCatColors = {};  // {categoryKey: '#hexcolor'} — Home Billings
+let _catModalSource = 'main'; // 'main' | 'home'
 let currentUser = null; // usuario logueado
 let nextUserId = 1;
 let nextMenuId = 1;
@@ -1413,11 +1488,23 @@ function initFromDrive(data) {
   // Cargar config (categorías, usuarios, menús)
   if (data && data.config) {
     const c = data.config;
-    if (c.catAll)      CAT_ALL        = c.catAll;
-    if (c.homeCatsInc) HOME_CATS_INC  = c.homeCatsInc;
-    if (c.homeCatsExp) HOME_CATS_EXP  = c.homeCatsExp;
-    if (c.homeCurr)    HOME_CURR      = c.homeCurr;
-    rebuildHomeCatsAll();
+    if (c.globalCats) {
+      // Nuevo formato
+      globalCats = c.globalCats;
+    } else {
+      // Migración desde formato antiguo
+      if (c.homeCatsInc) Object.entries(c.homeCatsInc).forEach(([k,lbl])=>{ if (!globalCats.inc[k]) globalCats.inc[k]={label:lbl,color:'#22c55e'}; });
+      if (c.homeCatsExp) Object.entries(c.homeCatsExp).forEach(([k,lbl])=>{ if (!globalCats.exp[k]) globalCats.exp[k]={label:lbl,color:'#ef4444'}; });
+      if (c.catAll)      Object.entries(c.catAll).forEach(([k,lbl])=>{ if (!globalCats.inc[k]&&!globalCats.exp[k]) globalCats.exp[k]={label:lbl,color:'#64748b'}; });
+      // Aplicar colores guardados
+      const cc = {...(c.catColors||{}), ...(c.homeCatColors||{})};
+      Object.entries(cc).forEach(([k,col])=>{
+        const gc = globalCats.inc[k] || globalCats.exp[k];
+        if (gc) gc.color = col;
+      });
+    }
+    if (c.homeCurr) HOME_CURR = c.homeCurr;
+    rebuildLegacyCatMaps();
     if (c.users && c.users.length)        { users = c.users; nextUserId = Math.max(...users.map(u=>u.id))+1; }
     if (c.customMenus && c.customMenus.length) {
       customMenus = c.customMenus;
@@ -1430,8 +1517,7 @@ function initFromDrive(data) {
   try {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{catAll:CAT_ALL,homeCatsInc:HOME_CATS_INC,homeCatsExp:HOME_CATS_EXP,
-              homeCurr:HOME_CURR,users:users,customMenus:customMenus}
+      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus}
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
@@ -1456,8 +1542,7 @@ function pushToDrive() {
     version: 1,
     lastUpdated: new Date().toISOString(),
     config: {
-      catAll:CAT_ALL, homeCatsInc:HOME_CATS_INC, homeCatsExp:HOME_CATS_EXP,
-      homeCurr:HOME_CURR, users:users, customMenus:menusPayload
+      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload
     },
     transactions:txs, deudas:deudas, home:homeTxs
   };
@@ -1491,18 +1576,25 @@ function pushToDrive() {
   }
 
   // Modo API externa (CASHMAP_API_URL configurado)
+  // Nota: usar text/plain evita el preflight CORS que GAS no maneja
   if (CASHMAP_API_URL) {
     fetch(CASHMAP_API_URL, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'text/plain;charset=UTF-8'},
       body: JSON.stringify(payload)
     })
-    .then(r => r.json())
-    .then(r => {
+    .then(r => r.text())
+    .then(text => {
+      let r;
+      try { r = JSON.parse(text); } catch(e) {
+        console.error('[CashMap] Respuesta no-JSON del servidor:', text.slice(0, 300));
+        setSyncBadge('error');
+        return;
+      }
       if (r && r.ok) setSyncBadge('ok', '✅ Guardado');
-      else setSyncBadge('error');
+      else { console.error('[CashMap] Error del servidor:', r); setSyncBadge('error'); }
     })
-    .catch(() => { pendingOfflineChanges = true; setSyncBadge('error'); });
+    .catch(err => { console.error('[CashMap] Error de red al guardar:', err); pendingOfflineChanges = true; setSyncBadge('error'); });
     return;
   }
 
@@ -1634,10 +1726,10 @@ function renderDash() {
   document.getElementById('recent-tbody').innerHTML = recent.map(t=>`
     <tr>
       <td>${t.date}</td>
-      <td>${t.description}</td>
-      <td>${catLabel(t.category)}</td>
-      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
       <td class="amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</td>
+      <td>${t.description}</td>
+      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
+      <td>${catLabel(t.category)}</td>
     </tr>
   `).join('');
 
@@ -1662,19 +1754,99 @@ function renderChartMonthly() {
   });
 }
 
+function getCatColor(key, idx) {
+  const cat = globalCats.inc[key] || globalCats.exp[key];
+  if (cat && cat.color) return cat.color;
+  return catColors[key] || DEFAULT_CAT_COLORS[(idx||0) % DEFAULT_CAT_COLORS.length];
+}
+function getHomeCatColor(key, idx) { return getCatColor(key, idx); }
+
+// Helpers usados por los handlers inline del modal de colores (chart)
+function _setCatColor(key, val) {
+  const cat = globalCats.inc[key] || globalCats.exp[key];
+  if (cat) cat.color = val;
+  else catColors[key] = val;
+  refreshAllCatCharts();
+  try { renderHome(); } catch(e) {}
+}
+function _delCatColor(key, defColor) {
+  const cat = globalCats.inc[key] || globalCats.exp[key];
+  if (cat) cat.color = defColor;
+  else delete catColors[key];
+  refreshAllCatCharts();
+  try { renderHome(); } catch(e) {}
+  const inp = document.querySelector('#catcolors-body input[data-key="'+key+'"]');
+  if (inp) inp.value = defColor;
+  scheduleSave();
+}
+
 function renderChartCat() {
   const cats = {};
   txs.filter(t=>t.type==='expense').forEach(t=>{
     cats[t.category] = (cats[t.category]||0) + t.amount;
   });
   const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const colors = ['#3b82f6','#ef4444','#f59e0b','#22c55e','#8b5cf6','#06b6d4','#ec4899','#f97316'];
+  const colors = sorted.map(([key], i) => getCatColor(key, i));
   const ctx = document.getElementById('chart-cat').getContext('2d');
   if (chartCat) chartCat.destroy();
   chartCat = new Chart(ctx, {
     type:'doughnut',
     data:{labels:sorted.map(([c])=>catLabel(c)),datasets:[{data:sorted.map(([,v])=>v),backgroundColor:colors,borderWidth:2,borderColor:'#1e293b'}]},
     options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}}}}
+  });
+}
+
+function openCatColorsModal(source) {
+  _catModalSource = source || 'main';
+  const isHome = _catModalSource === 'home';
+  const dataset   = isHome ? homeTxs : txs;
+  const colorMap  = isHome ? homeCatColors : catColors;
+  const labelFn   = isHome ? homeCatLabel : catLabel;
+
+  const cats = {};
+  dataset.filter(t=>t.type==='expense').forEach(t=>{
+    cats[t.category] = (cats[t.category]||0) + t.amount;
+  });
+  const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  const rows = sorted.map(([key, amt], i) => {
+    const color    = colorMap[key] || DEFAULT_CAT_COLORS[i % DEFAULT_CAT_COLORS.length];
+    const label    = labelFn(key);
+    const defColor = DEFAULT_CAT_COLORS[i % DEFAULT_CAT_COLORS.length];
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <input type="color" value="${color}" data-key="${key}"
+          oninput="_setCatColor('${key}', this.value);"
+          onchange="scheduleSave();"
+          style="width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:6px;padding:0">
+        <span style="flex:1;font-size:.88rem">${label}</span>
+        <span style="font-size:.75rem;color:var(--text2)">${fmt(amt)}</span>
+        <button onclick="_delCatColor('${key}','${defColor}');"
+          title="Restablecer" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.8rem;padding:2px 6px">↺</button>
+      </div>`;
+  }).join('');
+
+  const body = document.getElementById('catcolors-body');
+  if (body) {
+    body.innerHTML = rows || '<p style="color:var(--text2);font-size:.82rem;padding:12px 0">Sin gastos registrados.</p>';
+    document.getElementById('catcolors-modal').classList.add('open');
+  }
+}
+
+function closeCatColorsModal() {
+  document.getElementById('catcolors-modal').classList.remove('open');
+}
+
+function refreshAllCatCharts() {
+  // Dashboard principal
+  try { renderChartCat(); } catch(e) {}
+  // Home billings
+  try { renderHome(); } catch(e) {}
+  // Menús custom activos
+  customMenus.forEach(m => {
+    if (document.getElementById('cm-chart-cat-' + m.id)) {
+      try { renderCustomMenuView(m.id); } catch(e) {}
+    }
   });
 }
 
@@ -1703,10 +1875,10 @@ function renderMonthly() {
   document.getElementById('month-tbody').innerHTML = list.length ? list.map(t=>`
     <tr>
       <td>${t.date}</td>
-      <td>${t.description}</td>
-      <td>${catLabel(t.category)}</td>
-      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
       <td class="amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</td>
+      <td>${t.description}</td>
+      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
+      <td>${catLabel(t.category)}</td>
       <td>
         <button class="btn-icon" onclick="openTxModal(${t.id})" title="Editar">✏️</button>
       </td>
@@ -1726,11 +1898,10 @@ function populateCatFilter() {
   const sel = document.getElementById('f-cat');
   if (!sel) return;
   const prev = sel.value;
-  sel.innerHTML = '<option value="">Todas las categorías</option>';
-  Object.entries(CAT_ALL).forEach(([k,v])=>{
-    sel.innerHTML += `<option value="${k}">${v}</option>`;
-  });
-  if (CAT_ALL[prev]) sel.value = prev;
+  sel.innerHTML = '<option value="">Todas las categorías</option>'
+    + Object.entries(globalCats.inc).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')
+    + Object.entries(globalCats.exp).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  if ((globalCats.inc[prev]||globalCats.exp[prev])) sel.value = prev;
 }
 
 function renderHistory() {
@@ -1749,10 +1920,10 @@ function renderHistory() {
   document.getElementById('hist-tbody').innerHTML = list.length ? list.map(t=>`
     <tr>
       <td>${t.date}</td>
-      <td>${t.description}</td>
-      <td>${catLabel(t.category)}</td>
-      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
       <td class="amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</td>
+      <td>${t.description}</td>
+      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
+      <td>${catLabel(t.category)}</td>
       <td style="color:var(--text2);font-size:.78rem">${t.notes||'—'}</td>
       <td>
         <button class="btn-icon" onclick="openTxModal(${t.id})" title="Editar">✏️</button>
@@ -1826,9 +1997,31 @@ function renderBalance() {
 // ============================================================
 function updateCatOptions() {
   const sel = document.getElementById('tx-cat');
+  if (!sel) return;
   const prev = sel.value;
-  sel.innerHTML = Object.entries(CAT_ALL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
-  if (CAT_ALL[prev]) sel.value = prev;
+  const type = document.getElementById('tx-type')?.value;
+  const cats = type === 'income' ? globalCats.inc : globalCats.exp;
+  sel.innerHTML = Object.entries(cats).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  if (cats[prev]) sel.value = prev;
+  updateTxColorPicker();
+}
+
+function updateTxColorPicker() {
+  const row  = document.getElementById('tx-color-row');
+  const inp  = document.getElementById('tx-cat-color');
+  if (!row || !inp) return;
+  row.style.display = '';
+  const cat = document.getElementById('tx-cat').value;
+  inp.value = getCatColor(cat, 0);
+}
+
+function updateHomeTxColorPicker() {
+  const row  = document.getElementById('home-color-row');
+  const inp  = document.getElementById('home-cat-color');
+  if (!row || !inp) return;
+  row.style.display = '';
+  const cat = document.getElementById('home-tx-cat').value;
+  inp.value = getCatColor(cat, 0);
 }
 
 function openTxModal(id) {
@@ -1848,6 +2041,7 @@ function openTxModal(id) {
     updateCatOptions();
     document.getElementById('tx-cat').value = t.category;
     document.getElementById('tx-notes').value = t.notes || '';
+    updateTxColorPicker();
     del.style.display = 'inline-flex';
   } else {
     document.getElementById('modal-title').textContent = 'Nueva transacción';
@@ -1855,7 +2049,7 @@ function openTxModal(id) {
     document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('tx-amount').value = '';
     document.getElementById('tx-desc').value = '';
-    document.getElementById('tx-type').value = 'income';
+    document.getElementById('tx-type').value = 'expense';
     updateCatOptions();
     document.getElementById('tx-notes').value = '';
     del.style.display = 'none';
@@ -1887,6 +2081,14 @@ function saveTx() {
     if (idx >= 0) txs[idx] = {id:parseInt(id),date,amount,description:desc,type,category:cat,notes};
   } else {
     txs.push({id:nextId++,date,amount,description:desc,type,category:cat,notes});
+  }
+
+  // Guardar color de categoría en globalCats
+  const colorInp = document.getElementById('tx-cat-color');
+  if (colorInp) {
+    const gc = globalCats.inc[cat] || globalCats.exp[cat];
+    if (gc) gc.color = colorInp.value;
+    else catColors[cat] = colorInp.value; // fallback para cats no reconocidas
   }
 
   closeTxModal();
@@ -1976,7 +2178,7 @@ function switchView(el) {
   document.getElementById('topbar-title').textContent = titles[vId] || '';
   // Desktop "New" button
   const btnNew = document.getElementById('btn-new');
-  const newLabels = {'view-deudas':'+ Nueva deuda','view-home':'+ Nuevo registro hogar'};
+  const newLabels = {'view-deudas':'+ Nueva deuda','view-home':'+ Nuevo registro'};
   btnNew.textContent = newLabels[vId] || '+ Nueva transacción';
   // FAB icon
   const fab = document.getElementById('fab');
@@ -1994,10 +2196,9 @@ function switchView(el) {
 function populateHomeCatFilter() {
   const sel = document.getElementById('hf-cat');
   if (!sel) return;
-  sel.innerHTML = '<option value="">Todas las categorías</option>';
-  Object.entries(HOME_CATS_ALL).forEach(([k,v]) => {
-    sel.innerHTML += `<option value="${k}">${v}</option>`;
-  });
+  sel.innerHTML = '<option value="">Todas las categorías</option>'
+    + Object.entries(globalCats.inc).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')
+    + Object.entries(globalCats.exp).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
   // label de moneda en header y modal
   const lbl = document.getElementById('home-curr-label');
   if (lbl) lbl.textContent = HOME_CURR.trim();
@@ -2007,11 +2208,13 @@ function populateHomeCatFilter() {
 
 function updateHomeCatOptions() {
   const type = document.getElementById('home-tx-type').value;
-  const cats = type === 'income' ? HOME_CATS_INC : HOME_CATS_EXP;
+  const cats = type === 'income' ? globalCats.inc : globalCats.exp;
   const sel = document.getElementById('home-tx-cat');
+  if (!sel) return;
   const prev = sel.value;
-  sel.innerHTML = Object.entries(cats).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  sel.innerHTML = Object.entries(cats).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
   if (cats[prev]) sel.value = prev;
+  updateHomeTxColorPicker();
 }
 
 function renderHome() {
@@ -2060,7 +2263,7 @@ function renderHome() {
   const cats = {};
   homeTxs.filter(t=>t.type==='expense').forEach(t=>{ cats[t.category]=(cats[t.category]||0)+t.amount; });
   const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,9);
-  const colors = ['#a78bfa','#ef4444','#f59e0b','#22c55e','#3b82f6','#06b6d4','#ec4899','#f97316','#84cc16'];
+  const colors = sorted.map(([key], i) => getHomeCatColor(key, i));
   const ctx2 = document.getElementById('chart-home-cat').getContext('2d');
   if (chartHomeCat) chartHomeCat.destroy();
   chartHomeCat = new Chart(ctx2, {
@@ -2085,10 +2288,10 @@ function renderHome() {
   document.getElementById('home-tbody').innerHTML = list.length ? list.map(t=>`
     <tr>
       <td>${t.date}</td>
-      <td>${t.description}</td>
-      <td><span class="home-cat-badge">${homeCatLabel(t.category)}</span></td>
-      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
       <td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${fmtH(t.amount)}</td>
+      <td>${t.description}</td>
+      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
+      <td><span class="home-cat-badge">${homeCatLabel(t.category)}</span></td>
       <td style="font-size:.78rem;color:var(--text2)">${t.notes||'—'}</td>
       <td><button class="btn-icon" onclick="openHomeTxModal(${t.id})" title="Editar">✏️</button></td>
     </tr>`).join('') : '<tr><td colspan="7" class="empty">No hay registros del hogar</td></tr>';
@@ -2113,6 +2316,7 @@ function openHomeTxModal(id) {
     updateHomeCatOptions();
     document.getElementById('home-tx-cat').value = t.category;
     document.getElementById('home-tx-notes').value = t.notes || '';
+    updateHomeTxColorPicker();
     del.style.display = 'inline-flex';
   } else {
     document.getElementById('home-modal-title').textContent = '🏠 Nueva entrada hogar';
@@ -2155,6 +2359,13 @@ function saveHomeTx() {
   } else {
     homeTxs.push({ id:nextHomeId++, date, amount, description:desc, type, category:cat, notes });
   }
+
+  // Guardar color de categoría si es gasto
+  if (type === 'expense') {
+    const colorInp = document.getElementById('home-cat-color');
+    if (colorInp) homeCatColors[cat] = colorInp.value;
+  }
+
   closeHomeTxModal();
   renderHome();
   scheduleSave();
@@ -2634,7 +2845,7 @@ function buildCustomMenuViews() {
       <div class="cards" id="cm-cards-${m.id}"></div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos</h3><canvas id="cm-chart-monthly-${m.id}"></canvas></div>
-        <div class="chart-box"><h3>Gastos por categoría</h3><canvas id="cm-chart-cat-${m.id}"></canvas></div>
+        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="cm-chart-cat-${m.id}"></canvas></div>
       </div>
       <button class="filter-toggle-btn" onclick="toggleFilters('cmf-filters-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-month-${m.id}')">
         🔍 Buscar y filtrar
@@ -2651,13 +2862,35 @@ function buildCustomMenuViews() {
           ${['01','02','03','04','05','06','07','08','09','10','11','12'].map(mo=>`<option value="${mo}">${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(mo)-1]}</option>`).join('')}
         </select>
       </div>
+      <!-- Desglose por mes -->
+      <div class="tbl-wrap" style="margin-top:4px">
+        <div class="tbl-header" style="cursor:pointer;user-select:none" onclick="toggleCmBreakdown(${m.id})">
+          <h3 style="display:flex;align-items:center;gap:6px">
+            📊 Desglose por mes
+            <span id="cm-bk-arrow-${m.id}" style="font-size:.75rem;color:var(--text2)">▾</span>
+          </h3>
+          <span id="cm-bk-summary-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
+        </div>
+        <div id="cm-breakdown-${m.id}">
+          <div class="tbl-scroll">
+            <table><thead><tr>
+              <th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Balance</th><th>% Gastos</th>
+            </tr></thead>
+            <tbody id="cm-bk-tbody-${m.id}"></tbody>
+            <tfoot id="cm-bk-tfoot-${m.id}"></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Registros -->
       <div class="tbl-wrap">
         <div class="tbl-header">
           <h3>${m.icon} ${m.name} <span style="font-size:.72rem;color:var(--text2)">${m.currency}</span></h3>
           <span id="cm-count-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
         </div>
         <div class="tbl-scroll"><table><thead><tr>
-          <th>Fecha</th><th>Descripción</th><th>Tipo</th><th>Monto</th><th>Notas</th><th>Acciones</th>
+          <th>Fecha</th><th>Monto</th><th>Descripción</th><th>Tipo</th><th>Notas</th><th>Acciones</th>
         </tr></thead><tbody id="cm-tbody-${m.id}"></tbody></table></div>
       </div>`;
     slot.appendChild(div);
@@ -2766,7 +2999,7 @@ function renderCustomMenuView(menuId) {
 
   const cats={}; data.filter(t=>t.type==='expense').forEach(t=>{cats[t.category]=(cats[t.category]||0)+t.amount;});
   const sorted=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const colors=['#a78bfa','#ef4444','#f59e0b','#22c55e','#3b82f6','#06b6d4','#ec4899','#f97316'];
+  const colors=sorted.map(([key],i)=>getCatColor(key,i));
   const ctx2=document.getElementById('cm-chart-cat-'+menuId).getContext('2d');
   if (customCharts[menuId].cat) customCharts[menuId].cat.destroy();
   customCharts[menuId].cat=new Chart(ctx2,{type:'doughnut',data:{labels:sorted.map(([c])=>c),datasets:[{data:sorted.map(([,v])=>v),backgroundColor:colors,borderWidth:2,borderColor:'#1e293b'}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}}}}});
@@ -2785,12 +3018,94 @@ function renderCustomMenuView(menuId) {
   const ro = isReadOnly();
   document.getElementById('cm-tbody-'+menuId).innerHTML = list.length ? list.map(t=>`
     <tr>
-      <td>${t.date}</td><td>${t.description}</td>
-      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
+      <td>${t.date}</td>
       <td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${curr}${t.amount.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td>${t.description}</td>
+      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
       <td style="font-size:.78rem;color:var(--text2)">${t.notes||'—'}</td>
       <td>${ro?'':` <button class="btn-icon" onclick="openCustomTxModal(${menuId},${t.id})" title="Editar">✏️</button>`}</td>
     </tr>`).join('') : '<tr><td colspan="6" class="empty">Sin registros</td></tr>';
+
+  // Renderizar desglose mensual
+  renderCmBreakdown(menuId);
+}
+
+// ── Desglose por mes para menús personalizados ───────────────
+const _cmBreakdownOpen = {}; // estado de collapse por menuId
+
+function toggleCmBreakdown(menuId) {
+  _cmBreakdownOpen[menuId] = !_cmBreakdownOpen[menuId];
+  const el = document.getElementById('cm-breakdown-'+menuId);
+  const arrow = document.getElementById('cm-bk-arrow-'+menuId);
+  if (el) el.style.display = _cmBreakdownOpen[menuId] ? 'none' : '';
+  if (arrow) arrow.textContent = _cmBreakdownOpen[menuId] ? '▸' : '▾';
+}
+
+function renderCmBreakdown(menuId) {
+  const m = customMenus.find(x=>x.id===menuId);
+  if (!m) return;
+  const data = m.data || [];
+  const curr = m.currency + ' ';
+  const MES_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const fmt2 = v => curr + (v||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  // Agrupar por año-mes
+  const monthMap = {};
+  data.forEach(t => {
+    const ym = t.date.substring(0,7); // 'YYYY-MM'
+    if (!monthMap[ym]) monthMap[ym] = {inc:0, exp:0};
+    if (t.type==='income')  monthMap[ym].inc += t.amount;
+    else                    monthMap[ym].exp += t.amount;
+  });
+
+  const months = Object.keys(monthMap).sort();
+  const tbody = document.getElementById('cm-bk-tbody-'+menuId);
+  const tfoot = document.getElementById('cm-bk-tfoot-'+menuId);
+  if (!tbody) return;
+
+  if (!months.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty" style="padding:12px">Sin registros</td></tr>';
+    tfoot.innerHTML = '';
+    const sum = document.getElementById('cm-bk-summary-'+menuId);
+    if (sum) sum.textContent = '';
+    return;
+  }
+
+  let totalInc = 0, totalExp = 0;
+  tbody.innerHTML = months.map(ym => {
+    const [yr, mo] = ym.split('-');
+    const {inc, exp} = monthMap[ym];
+    const net = inc - exp;
+    const pct = (inc + exp) > 0 ? Math.round(exp / (inc + exp) * 100) : (exp > 0 ? 100 : 0);
+    totalInc += inc; totalExp += exp;
+    return `<tr>
+      <td style="font-weight:600;white-space:nowrap">${MES_NAMES[parseInt(mo)-1]} ${yr}</td>
+      <td class="amount income">${fmt2(inc)}</td>
+      <td class="amount expense">${fmt2(exp)}</td>
+      <td class="amount ${net>=0?'income':'expense'}">${net>=0?'+':''}${fmt2(Math.abs(net))}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="flex:1;height:6px;background:var(--bg3);border-radius:99px;overflow:hidden">
+            <div style="width:${Math.min(pct,100)}%;height:100%;background:var(--red);border-radius:99px"></div>
+          </div>
+          <span style="font-size:.72rem;color:var(--text2);white-space:nowrap">${pct}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const totalNet = totalInc - totalExp;
+  const totalPct = (totalInc + totalExp) > 0 ? Math.round(totalExp / (totalInc + totalExp) * 100) : 0;
+  tfoot.innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border)">
+    <td style="font-size:.8rem;color:var(--text2)">TOTAL</td>
+    <td class="amount income">${fmt2(totalInc)}</td>
+    <td class="amount expense">${fmt2(totalExp)}</td>
+    <td class="amount ${totalNet>=0?'income':'expense'}">${totalNet>=0?'+':''}${fmt2(Math.abs(totalNet))}</td>
+    <td style="font-size:.78rem;color:var(--text2)">${totalPct}% gastos</td>
+  </tr>`;
+
+  const sum = document.getElementById('cm-bk-summary-'+menuId);
+  if (sum) sum.textContent = months.length + ' mes(es) · ' + data.length + ' reg.';
 }
 
 // Modal reutilizado (home-tx-modal) para custom menus
@@ -2976,11 +3291,36 @@ function renderMenusList() {
     </div>`).join('');
 }
 
+// Helpers para el selector de moneda en el form de menú
+function updateMenuCurrField(val) {
+  const inp = document.getElementById('mf-curr');
+  if (val === 'custom') { inp.style.display=''; inp.value=''; inp.focus(); }
+  else { inp.style.display='none'; inp.value=val; }
+}
+function getMenuCurrValue() {
+  const sel = document.getElementById('mf-curr-sel');
+  if (!sel) return '$';
+  return sel.value === 'custom'
+    ? (document.getElementById('mf-curr').value.trim() || '$')
+    : sel.value;
+}
+function setMenuCurrUI(currVal) {
+  const sel = document.getElementById('mf-curr-sel');
+  const inp = document.getElementById('mf-curr');
+  if (!sel || !inp) return;
+  const known = Array.from(sel.options).map(o=>o.value).filter(v=>v!=='custom');
+  if (known.includes(currVal)) {
+    sel.value = currVal; inp.style.display='none'; inp.value=currVal;
+  } else {
+    sel.value = 'custom'; inp.style.display=''; inp.value=currVal;
+  }
+}
+
 function resetMenuForm() {
   document.getElementById('mf-id').value='';
   document.getElementById('mf-icon').value='📂';
   document.getElementById('mf-name').value='';
-  document.getElementById('mf-curr').value='$';
+  setMenuCurrUI('$');
   document.getElementById('mf-pin').value='';
   document.getElementById('mf-access').value='viewer';
   document.getElementById('menu-form-title').textContent='+ Nuevo menú';
@@ -2992,7 +3332,7 @@ function editCustomMenuAdmin(id) {
   document.getElementById('mf-id').value=m.id;
   document.getElementById('mf-icon').value=m.icon;
   document.getElementById('mf-name').value=m.name;
-  document.getElementById('mf-curr').value=m.currency;
+  setMenuCurrUI(m.currency || '$');
   document.getElementById('mf-pin').value=m.pin||'';
   document.getElementById('mf-access').value=m.access||'viewer';
   document.getElementById('menu-form-title').textContent='✏️ Editando: '+m.name;
@@ -3002,7 +3342,7 @@ function saveCustomMenu() {
   const id     = document.getElementById('mf-id').value;
   const icon   = document.getElementById('mf-icon').value.trim() || '📂';
   const name   = document.getElementById('mf-name').value.trim();
-  const curr   = document.getElementById('mf-curr').value.trim() || '$';
+  const curr   = getMenuCurrValue();
   const pin    = document.getElementById('mf-pin').value;
   const access = document.getElementById('mf-access').value;
   if (!name) { alert('El nombre del menú es requerido.'); return; }
@@ -3040,12 +3380,12 @@ document.getElementById('tx-modal').addEventListener('click', function(e) {
 // ============================================================
 // GESTIÓN DE CATEGORÍAS
 // ============================================================
-let currentCatsTab = 'zelle'; // 'zelle' | 'home-inc' | 'home-exp' | 'config'
+let currentCatsTab = 'inc'; // 'inc' | 'exp' | 'config'
 
-function openCatsModal() {
-  currentCatsTab = 'zelle';
+function openCatsModal(tab) {
+  currentCatsTab = tab || 'inc';
   resetCatForm();
-  renderCatsList();
+  switchCatsTab(currentCatsTab);
   document.getElementById('cats-modal').classList.add('open');
 }
 
@@ -3061,7 +3401,6 @@ function switchCatsTab(tab) {
   currentCatsTab = tab;
   document.querySelectorAll('.cats-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   resetCatForm();
-  // Mostrar/ocultar panel config vs lista+form
   const isConfig = tab === 'config';
   document.getElementById('cats-list-wrap').style.display = isConfig ? 'none' : 'block';
   document.getElementById('cats-form').style.display      = isConfig ? 'none' : 'block';
@@ -3074,10 +3413,7 @@ function switchCatsTab(tab) {
 }
 
 function currentCatObj() {
-  if (currentCatsTab === 'zelle')    return CAT_ALL;
-  if (currentCatsTab === 'home-inc') return HOME_CATS_INC;
-  if (currentCatsTab === 'home-exp') return HOME_CATS_EXP;
-  return {};
+  return globalCats[currentCatsTab] || globalCats.exp;
 }
 
 function renderCatsList() {
@@ -3089,21 +3425,25 @@ function renderCatsList() {
     return;
   }
   wrap.innerHTML = entries.map(([k, v]) => `
-    <div class="cat-row">
-      <span class="cat-row-label">${v}</span>
-      <span class="cat-row-key">${k}</span>
-      <div class="cat-row-actions">
-        <button onclick="editCatEntry('${k}')">✏️</button>
-        <button onclick="deleteCatEntry('${k}')" style="color:var(--red)">🗑</button>
-      </div>
+    <div class="cat-row" style="display:flex;align-items:center;gap:8px;padding:8px 6px;border-bottom:1px solid var(--border)">
+      <span style="width:20px;height:20px;border-radius:50%;background:${v.color};flex-shrink:0;display:inline-block;border:2px solid var(--bg2)"></span>
+      <span class="cat-row-label" style="flex:1;font-size:.85rem">${v.label}</span>
+      <span class="cat-row-key" style="font-size:.72rem;color:var(--text2);background:var(--bg3);padding:1px 7px;border-radius:99px">${k}</span>
+      <input type="color" value="${v.color}" title="Cambiar color"
+        onchange="globalCats['${currentCatsTab}']['${k}'].color=this.value;renderCatsList();rebuildLegacyCatMaps();refreshAllCatCharts();try{renderHome();}catch(e){}scheduleSave();"
+        style="width:26px;height:26px;border:none;background:none;cursor:pointer;border-radius:4px;padding:0;flex-shrink:0">
+      <button onclick="editCatEntry('${k}')" style="background:none;border:none;cursor:pointer;font-size:.85rem;padding:2px 5px" title="Editar">✏️</button>
+      <button onclick="deleteCatEntry('${k}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:.85rem;padding:2px 5px" title="Eliminar">🗑</button>
     </div>`).join('');
 }
 
 function editCatEntry(key) {
   const obj = currentCatObj();
-  document.getElementById('cat-edit-key').value = key;
+  const entry = obj[key];
+  document.getElementById('cat-edit-key').value  = key;
   document.getElementById('cat-new-key').value   = key;
-  document.getElementById('cat-new-label').value = obj[key] || '';
+  document.getElementById('cat-new-label').value = entry?.label || '';
+  document.getElementById('cat-new-color').value = entry?.color || '#3b82f6';
   document.getElementById('cats-form-title').textContent = '✏️ Editando: ' + key;
   document.getElementById('cat-new-key').focus();
 }
@@ -3112,36 +3452,31 @@ function resetCatForm() {
   document.getElementById('cat-edit-key').value  = '';
   document.getElementById('cat-new-key').value   = '';
   document.getElementById('cat-new-label').value = '';
+  const colorEl = document.getElementById('cat-new-color');
+  if (colorEl) colorEl.value = currentCatsTab === 'inc' ? '#22c55e' : '#ef4444';
   document.getElementById('cats-form-title').textContent = '+ Nueva categoría';
 }
 
 function saveCatEntry() {
-  const editKey   = document.getElementById('cat-edit-key').value.trim();
-  const newKey    = document.getElementById('cat-new-key').value.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
-  const newLabel  = document.getElementById('cat-new-label').value.trim();
+  const editKey  = document.getElementById('cat-edit-key').value.trim();
+  const newKey   = document.getElementById('cat-new-key').value.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+  const newLabel = document.getElementById('cat-new-label').value.trim();
+  const newColor = document.getElementById('cat-new-color').value || '#3b82f6';
 
-  if (!newKey || !newLabel) {
-    alert('Completa clave y nombre.');
-    return;
-  }
+  if (!newKey || !newLabel) { alert('Completa clave y nombre.'); return; }
 
   const obj = currentCatObj();
 
-  // Si editamos y la clave cambió, eliminar la vieja
+  // Si la clave cambió, migrar transacciones
   if (editKey && editKey !== newKey) {
     delete obj[editKey];
-    // Si hay transacciones que usaban la clave vieja, migrarlas
-    if (currentCatsTab === 'zelle') {
-      txs.forEach(t => { if (t.category === editKey) t.category = newKey; });
-    } else {
-      homeTxs.forEach(t => { if (t.category === editKey) t.category = newKey; });
-    }
+    txs.forEach(t     => { if (t.category === editKey) t.category = newKey; });
+    homeTxs.forEach(t => { if (t.category === editKey) t.category = newKey; });
+    customMenus.forEach(m => m.data?.forEach(t => { if (t.category === editKey) t.category = newKey; }));
   }
 
-  obj[newKey] = newLabel;
-
-  if (currentCatsTab !== 'zelle') rebuildHomeCatsAll();
-
+  obj[newKey] = { label: newLabel, color: newColor };
+  rebuildLegacyCatMaps();
   resetCatForm();
   renderCatsList();
   populateCatFilter();
@@ -3153,10 +3488,10 @@ function saveCatEntry() {
 }
 
 function deleteCatEntry(key) {
-  if (!confirm('¿Eliminar la categoría "' + key + '"? Las transacciones que la usen quedarán con clave sin nombre.')) return;
+  if (!confirm('¿Eliminar la categoría "' + key + '"?')) return;
   const obj = currentCatObj();
   delete obj[key];
-  if (currentCatsTab !== 'zelle') rebuildHomeCatsAll();
+  rebuildLegacyCatMaps();
   renderCatsList();
   populateCatFilter();
   updateCatOptions();
