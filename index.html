@@ -2035,7 +2035,7 @@ function renderHistory() {
   if (tp) list = list.filter(t=>t.type===tp);
   if (cat) list = list.filter(t=>t.category===cat);
   if (mm) list = list.filter(t=>txMonth(t)===mm);
-  list.sort((a,b)=>b.date.localeCompare(a.date));
+  list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
   document.getElementById('hist-count').textContent = list.length + ' transacciones';
   document.getElementById('hist-tbody').innerHTML = list.length ? list.map(t=>`
@@ -2406,7 +2406,7 @@ function renderHome() {
   if (tp)  list = list.filter(t=>t.type===tp);
   if (cat) list = list.filter(t=>t.category===cat);
   if (mm)  list = list.filter(t=>t.date.substring(5,7)===mm);
-  list.sort((a,b)=>b.date.localeCompare(a.date));
+  list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
   document.getElementById('home-count').textContent = list.length + ' registro(s)';
   document.getElementById('home-tbody').innerHTML = list.length ? list.map(t=>`
@@ -2535,7 +2535,7 @@ function renderDeudas() {
   if (s) list = list.filter(d=>d.persona.toLowerCase().includes(s)||(d.description||'').toLowerCase().includes(s));
   if (tp) list = list.filter(d=>d.type===tp);
   if (st) list = list.filter(d=>d.status===st);
-  list.sort((a,b)=>b.date.localeCompare(a.date));
+  list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
   // Calcular totales por estado (pendiente + parcial = aún tiene saldo)
   const activas = d => d.status !== 'pagado';
@@ -3180,7 +3180,7 @@ function renderCustomMenuView(menuId) {
   if (s) list=list.filter(t=>t.description.toLowerCase().includes(s));
   if (tp) list=list.filter(t=>t.type===tp);
   if (mm) list=list.filter(t=>t.date.substring(5,7)===mm);
-  list.sort((a,b)=>b.date.localeCompare(a.date));
+  list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
   document.getElementById('cm-count-'+menuId).textContent = list.length + ' registro(s)';
   const ro = isReadOnly();
