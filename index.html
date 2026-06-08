@@ -2958,27 +2958,6 @@ function buildCustomMenuViews() {
           ${['01','02','03','04','05','06','07','08','09','10','11','12'].map(mo=>`<option value="${mo}">${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(mo)-1]}</option>`).join('')}
         </select>
       </div>
-      <!-- Desglose por mes -->
-      <div class="tbl-wrap" style="margin-top:4px">
-        <div class="tbl-header" style="cursor:pointer;user-select:none" onclick="toggleCmBreakdown(${m.id})">
-          <h3 style="display:flex;align-items:center;gap:6px">
-            📊 Desglose por mes
-            <span id="cm-bk-arrow-${m.id}" style="font-size:.75rem;color:var(--text2)">▾</span>
-          </h3>
-          <span id="cm-bk-summary-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
-        </div>
-        <div id="cm-breakdown-${m.id}">
-          <div class="tbl-scroll">
-            <table><thead><tr>
-              <th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Balance</th><th>% Gastos</th>
-            </tr></thead>
-            <tbody id="cm-bk-tbody-${m.id}"></tbody>
-            <tfoot id="cm-bk-tfoot-${m.id}"></tfoot>
-            </table>
-          </div>
-        </div>
-      </div>
-
       <!-- Registros -->
       <div class="tbl-wrap">
         <div class="tbl-header">
@@ -3122,86 +3101,6 @@ function renderCustomMenuView(menuId) {
       <td>${ro?'':` <button class="btn-icon" onclick="openCustomTxModal(${menuId},${t.id})" title="Editar">✏️</button>`}</td>
     </tr>`).join('') : '<tr><td colspan="6" class="empty">Sin registros</td></tr>';
 
-  // Renderizar desglose mensual
-  renderCmBreakdown(menuId);
-}
-
-// ── Desglose por mes para menús personalizados ───────────────
-const _cmBreakdownOpen = {}; // estado de collapse por menuId
-
-function toggleCmBreakdown(menuId) {
-  _cmBreakdownOpen[menuId] = !_cmBreakdownOpen[menuId];
-  const el = document.getElementById('cm-breakdown-'+menuId);
-  const arrow = document.getElementById('cm-bk-arrow-'+menuId);
-  if (el) el.style.display = _cmBreakdownOpen[menuId] ? 'none' : '';
-  if (arrow) arrow.textContent = _cmBreakdownOpen[menuId] ? '▸' : '▾';
-}
-
-function renderCmBreakdown(menuId) {
-  const m = customMenus.find(x=>x.id===menuId);
-  if (!m) return;
-  const data = m.data || [];
-  const curr = m.currency + ' ';
-  const MES_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const fmt2 = v => curr + (v||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
-
-  // Agrupar por año-mes
-  const monthMap = {};
-  data.forEach(t => {
-    const ym = t.date.substring(0,7); // 'YYYY-MM'
-    if (!monthMap[ym]) monthMap[ym] = {inc:0, exp:0};
-    if (t.type==='income')  monthMap[ym].inc += t.amount;
-    else                    monthMap[ym].exp += t.amount;
-  });
-
-  const months = Object.keys(monthMap).sort();
-  const tbody = document.getElementById('cm-bk-tbody-'+menuId);
-  const tfoot = document.getElementById('cm-bk-tfoot-'+menuId);
-  if (!tbody) return;
-
-  if (!months.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty" style="padding:12px">Sin registros</td></tr>';
-    tfoot.innerHTML = '';
-    const sum = document.getElementById('cm-bk-summary-'+menuId);
-    if (sum) sum.textContent = '';
-    return;
-  }
-
-  let totalInc = 0, totalExp = 0;
-  tbody.innerHTML = months.map(ym => {
-    const [yr, mo] = ym.split('-');
-    const {inc, exp} = monthMap[ym];
-    const net = inc - exp;
-    const pct = (inc + exp) > 0 ? Math.round(exp / (inc + exp) * 100) : (exp > 0 ? 100 : 0);
-    totalInc += inc; totalExp += exp;
-    return `<tr>
-      <td style="font-weight:600;white-space:nowrap">${MES_NAMES[parseInt(mo)-1]} ${yr}</td>
-      <td class="amount income">${fmt2(inc)}</td>
-      <td class="amount expense">${fmt2(exp)}</td>
-      <td class="amount ${net>=0?'income':'expense'}">${net>=0?'+':''}${fmt2(Math.abs(net))}</td>
-      <td>
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="flex:1;height:6px;background:var(--bg3);border-radius:99px;overflow:hidden">
-            <div style="width:${Math.min(pct,100)}%;height:100%;background:var(--red);border-radius:99px"></div>
-          </div>
-          <span style="font-size:.72rem;color:var(--text2);white-space:nowrap">${pct}%</span>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-
-  const totalNet = totalInc - totalExp;
-  const totalPct = (totalInc + totalExp) > 0 ? Math.round(totalExp / (totalInc + totalExp) * 100) : 0;
-  tfoot.innerHTML = `<tr style="font-weight:700;border-top:2px solid var(--border)">
-    <td style="font-size:.8rem;color:var(--text2)">TOTAL</td>
-    <td class="amount income">${fmt2(totalInc)}</td>
-    <td class="amount expense">${fmt2(totalExp)}</td>
-    <td class="amount ${totalNet>=0?'income':'expense'}">${totalNet>=0?'+':''}${fmt2(Math.abs(totalNet))}</td>
-    <td style="font-size:.78rem;color:var(--text2)">${totalPct}% gastos</td>
-  </tr>`;
-
-  const sum = document.getElementById('cm-bk-summary-'+menuId);
-  if (sum) sum.textContent = months.length + ' mes(es) · ' + data.length + ' reg.';
 }
 
 // Modal reutilizado (home-tx-modal) para custom menus
