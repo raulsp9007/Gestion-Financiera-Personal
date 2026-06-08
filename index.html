@@ -295,7 +295,7 @@
     #topbar .top-actions .btn-ghost{display:none}
     #btn-new{display:none}
     /* Icono ⚙️ y 🔐 se quedan — ya son icon-only */
-    #settings-btn,#admin-btn{padding:0 8px;font-size:1.15rem;min-width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px}
+    #settings-btn,#admin-btn,#logout-btn{padding:0 8px;font-size:1.15rem;min-width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px}
     #topbar-user{display:none!important} /* badge de usuario va en sidebar; no en topbar mobile */
 
     /* ── Summary strip (totales rápidos encima de las cards) ─── */
@@ -751,6 +751,7 @@
       <button class="btn btn-ghost" id="import-btn" onclick="importJSON()">⬆ Importar JSON</button>
       <button class="btn btn-ghost" id="settings-btn" onclick="openCatsModal()" title="Categorías" style="padding:0 10px;font-size:1.1rem">⚙️</button>
       <button class="btn btn-ghost" id="admin-btn" onclick="openAdminModal()" title="Usuarios y menús" style="padding:0 10px;font-size:1.1rem;display:none">🔐</button>
+      <button class="btn btn-ghost" id="logout-btn" onclick="openUserMenu()" title="Cerrar sesión" style="padding:0 10px;font-size:1.1rem;display:none">👤</button>
       <div id="topbar-user" style="display:none">
         <div id="user-badge" onclick="openUserMenu()" style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--text2);padding:5px 10px;border-radius:8px;background:var(--bg3);cursor:pointer;border:1px solid var(--border)">
           <span id="topbar-user-name">—</span>
@@ -3007,9 +3008,10 @@ function openUserMenu() {
 
 function applyRoleUI() {
   const isAdmin = !currentUser || currentUser.role === 'admin';
-  // Botón Admin visible solo para admin
   const ab = document.getElementById('admin-btn');
   if (ab) ab.style.display = isAdmin ? '' : 'none';
+  const lb = document.getElementById('logout-btn');
+  if (lb) lb.style.display = currentUser ? '' : 'none';
   // Badge de usuario
   if (currentUser) {
     const tb = document.getElementById('topbar-user');
