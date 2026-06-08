@@ -2946,6 +2946,12 @@ function renderApp() {
   buildCustomMenuViews();
   renderNavForUser();
   renderAll();
+  // Default view: primer menú custom accesible — se aplica DESPUÉS de renderAll
+  const firstMenu = customMenus.find(m => canAccess(m.access));
+  if (firstMenu) {
+    doSwitchToCustomMenu(firstMenu.id, null);
+    buildSidebarNav();
+  }
 }
 
 function invalidateAllSessions() {
@@ -3151,6 +3157,15 @@ function switchViewById(vId, el) {
   const view = document.getElementById(vId);
   if (view) view.classList.add('active');
   currentView = vId;
+  // Actualizar título del topbar
+  if (vId.startsWith('view-custom-')) {
+    const mid = parseInt(vId.replace('view-custom-',''));
+    const m = customMenus.find(x=>x.id===mid);
+    const tb = document.getElementById('topbar-title');
+    if (tb) tb.textContent = m ? m.icon+' '+m.name : 'Menú';
+    const fab = document.getElementById('fab');
+    if (fab) { fab.textContent = m ? m.icon : '📂'; fab.title = 'Nuevo registro'; }
+  }
   document.getElementById('content').scrollTop = 0;
 }
 
