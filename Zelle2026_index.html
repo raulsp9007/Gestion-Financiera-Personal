@@ -1215,7 +1215,7 @@
     <div id="catcolors-body" style="max-height:380px;overflow-y:auto"></div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn btn-ghost" onclick="closeCatColorsModal()">Cerrar</button>
-      <button class="btn btn-primary" onclick="Object.keys(catColors).length&&(renderChartCat(),scheduleSave()); closeCatColorsModal();">Guardar</button>
+      <button class="btn btn-primary" onclick="refreshAllCatCharts(); scheduleSave(); closeCatColorsModal();">Guardar</button>
     </div>
   </div>
 </div>
@@ -1738,6 +1738,19 @@ function closeCatColorsModal() {
   document.getElementById('catcolors-modal').classList.remove('open');
 }
 
+function refreshAllCatCharts() {
+  // Dashboard principal
+  try { renderChartCat(); } catch(e) {}
+  // Home billings
+  try { renderHome(); } catch(e) {}
+  // Menús custom activos
+  customMenus.forEach(m => {
+    if (document.getElementById('cm-chart-cat-' + m.id)) {
+      try { renderCustomMenuView(m.id); } catch(e) {}
+    }
+  });
+}
+
 // ============================================================
 // MONTHLY
 // ============================================================
@@ -2120,7 +2133,7 @@ function renderHome() {
   const cats = {};
   homeTxs.filter(t=>t.type==='expense').forEach(t=>{ cats[t.category]=(cats[t.category]||0)+t.amount; });
   const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,9);
-  const colors = ['#a78bfa','#ef4444','#f59e0b','#22c55e','#3b82f6','#06b6d4','#ec4899','#f97316','#84cc16'];
+  const colors = sorted.map(([key], i) => getCatColor(key, i));
   const ctx2 = document.getElementById('chart-home-cat').getContext('2d');
   if (chartHomeCat) chartHomeCat.destroy();
   chartHomeCat = new Chart(ctx2, {
@@ -2826,7 +2839,7 @@ function renderCustomMenuView(menuId) {
 
   const cats={}; data.filter(t=>t.type==='expense').forEach(t=>{cats[t.category]=(cats[t.category]||0)+t.amount;});
   const sorted=Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const colors=['#a78bfa','#ef4444','#f59e0b','#22c55e','#3b82f6','#06b6d4','#ec4899','#f97316'];
+  const colors=sorted.map(([key],i)=>getCatColor(key,i));
   const ctx2=document.getElementById('cm-chart-cat-'+menuId).getContext('2d');
   if (customCharts[menuId].cat) customCharts[menuId].cat.destroy();
   customCharts[menuId].cat=new Chart(ctx2,{type:'doughnut',data:{labels:sorted.map(([c])=>c),datasets:[{data:sorted.map(([,v])=>v),backgroundColor:colors,borderWidth:2,borderColor:'#1e293b'}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}}}}});
