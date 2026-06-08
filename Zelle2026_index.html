@@ -500,12 +500,28 @@
     /* ── Balance chart ───────────────────────────────────────── */
     .balance-timeline canvas{max-height:170px}
 
-    /* ── Fix: Dashboard recent-tbody (5 cols, sin acciones)     */
-    /* td:last-child genérico pone el monto en position:absolute */
+    /* ── Fix: recent-tbody (5 cols: Fecha/Monto/Desc/Tipo/Categoría) */
+    /* Col 5 (Categoría) es td:last-child → el genérico la posiciona  */
+    /* absolute con font grande. Restaurar como badge inline pequeño.  */
     #recent-tbody tr td:last-child{
       position:static!important;
-      display:block!important;width:100%;
-      font-size:1rem;font-weight:800;margin-top:6px;
+      display:inline-block!important;
+      width:auto!important;
+      font-size:.7rem!important;font-weight:400!important;
+      background:var(--bg3)!important;
+      padding:2px 8px!important;border-radius:99px!important;
+      color:var(--text2)!important;
+      margin-left:4px!important;margin-top:0!important;
+    }
+
+    /* ── Fix: cm-tbody (6 cols: Fecha/Monto/Desc/Tipo/Notas/Acc) */
+    /* Col 5 es Notas (texto), no Categoría → quitar badge styling */
+    [id^="cm-tbody-"] tr td:nth-child(5){
+      background:transparent!important;
+      padding:0!important;border-radius:0!important;
+      display:block!important;width:100%!important;
+      font-size:.72rem!important;color:var(--text2)!important;
+      margin-left:0!important;margin-top:2px!important;
     }
 
     /* ── Fix: Balance-tbody (cols: mes / inc / exp / net / cum) */
@@ -1116,10 +1132,28 @@
       <div id="menus-list" style="max-height:220px;overflow-y:auto;margin-bottom:14px"></div>
       <div style="background:var(--bg3);border-radius:10px;padding:14px" id="menu-form-wrap">
         <div style="font-size:.8rem;font-weight:600;color:var(--text2);margin-bottom:10px" id="menu-form-title">+ Nuevo menú</div>
-        <div style="display:grid;grid-template-columns:60px 1fr 110px;gap:8px">
+        <div style="display:grid;grid-template-columns:60px 1fr;gap:8px">
           <div class="form-row" style="margin:0"><label style="font-size:.74rem">Icono</label><input type="text" id="mf-icon" placeholder="📊" style="text-align:center;font-size:1.2rem"></div>
           <div class="form-row" style="margin:0"><label style="font-size:.74rem">Nombre del menú</label><input type="text" id="mf-name" placeholder="Ej: Ahorros, Negocio..."></div>
-          <div class="form-row" style="margin:0"><label style="font-size:.74rem">Moneda</label><input type="text" id="mf-curr" placeholder="$, L, €..." style="text-align:center"></div>
+        </div>
+        <div class="form-row" style="margin:8px 0 0">
+          <label style="font-size:.74rem">Moneda</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="mf-curr-sel" onchange="updateMenuCurrField(this.value)" style="flex:1">
+              <option value="$">🇺🇸 USD — $</option>
+              <option value="€">🇪🇺 EUR — €</option>
+              <option value="L">🇭🇳 HNL — L</option>
+              <option value="RD$">🇩🇴 DOP — RD$</option>
+              <option value="MXN$">🇲🇽 MXN — MXN$</option>
+              <option value="£">🇬🇧 GBP — £</option>
+              <option value="COP$">🇨🇴 COP — COP$</option>
+              <option value="Q">🇬🇹 GTQ — Q</option>
+              <option value="₡">🇨🇷 CRC — ₡</option>
+              <option value="custom">✏️ Otra moneda...</option>
+            </select>
+            <input type="text" id="mf-curr" placeholder="símbolo..." maxlength="6"
+              style="width:80px;display:none;text-align:center" oninput="this.value=this.value.toUpperCase()">
+          </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
           <div class="form-row" style="margin:0">
@@ -1174,28 +1208,32 @@
 
     <!-- Tabs -->
     <div id="cats-tabs" style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap">
-      <button class="cats-tab active" data-tab="zelle" onclick="switchCatsTab('zelle')">💱 Zelle</button>
-      <button class="cats-tab" data-tab="home-inc" onclick="switchCatsTab('home-inc')">🏠 Hogar Ingresos</button>
-      <button class="cats-tab" data-tab="home-exp" onclick="switchCatsTab('home-exp')">🏠 Hogar Gastos</button>
+      <button class="cats-tab active" data-tab="inc" onclick="switchCatsTab('inc')">💰 Ingresos</button>
+      <button class="cats-tab" data-tab="exp" onclick="switchCatsTab('exp')">💸 Gastos</button>
       <button class="cats-tab" data-tab="config" onclick="switchCatsTab('config')">🔧 Config</button>
     </div>
 
     <!-- Listas de categorías -->
-    <div id="cats-list-wrap" style="max-height:340px;overflow-y:auto;margin-bottom:14px">
+    <div id="cats-list-wrap" style="max-height:300px;overflow-y:auto;margin-bottom:14px">
       <div id="cats-list"></div>
     </div>
 
     <!-- Formulario agregar/editar -->
     <div id="cats-form" style="background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:14px">
       <div style="font-size:.8rem;font-weight:600;color:var(--text2);margin-bottom:10px" id="cats-form-title">+ Nueva categoría</div>
-      <div style="display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:end">
+      <div style="display:grid;grid-template-columns:90px 1fr 48px;gap:8px;align-items:end">
         <div class="form-row" style="margin:0">
-          <label style="font-size:.74rem">Emoji + clave</label>
-          <input type="text" id="cat-new-key" placeholder="clave_unica" style="font-size:.82rem">
+          <label style="font-size:.74rem">Clave única</label>
+          <input type="text" id="cat-new-key" placeholder="clave_id" style="font-size:.82rem">
         </div>
         <div class="form-row" style="margin:0">
           <label style="font-size:.74rem">Nombre visible</label>
           <input type="text" id="cat-new-label" placeholder="ej: 🍔 Comida rápida" style="font-size:.82rem">
+        </div>
+        <div class="form-row" style="margin:0">
+          <label style="font-size:.74rem">Color</label>
+          <input type="color" id="cat-new-color" value="#3b82f6"
+            style="width:40px;height:36px;border:none;background:none;cursor:pointer;border-radius:6px;padding:0">
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px">
@@ -1303,58 +1341,61 @@ const MONTH_KEYS = ['01','02','03','04','05','06','07','08','09','10','11','12']
 // CATEGORÍAS — DINÁMICAS (editables desde el panel de config)
 // ============================================================
 // Zelle (USD) — ingresos y gastos compartidos en un solo objeto
-let CAT_ALL = {
-  ingresos:  '💰 Ingresos',
-  ventas:    '💱 Ventas',
-  envios:    '📦 Envíos',
-  compras:   '🛒 Compras',
-  prestamos: '🤝 Préstamos',
-  deuda:     '💳 Deuda',
-  servicios: '🔧 Servicios',
-  otros:     '📌 Otros'
+// ── Categorías globales — compartidas por todos los menús ────
+let globalCats = {
+  inc: {
+    ingresos:  { label: '💰 Ingresos generales', color: '#22c55e' },
+    ventas:    { label: '💱 Ventas', color: '#3b82f6' },
+    envios:    { label: '📦 Envíos recibidos', color: '#06b6d4' },
+    salario:   { label: '💼 Salario', color: '#8b5cf6' },
+    freelance: { label: '💻 Freelance/Extra', color: '#f59e0b' },
+    pension:   { label: '🏦 Pensión/Beneficio', color: '#ec4899' },
+    renta_inc: { label: '🏠 Renta recibida', color: '#f97316' },
+    bono:      { label: '🎁 Bono/Premio', color: '#a78bfa' },
+    otros_inc: { label: '📌 Otros ingresos', color: '#94a3b8' },
+  },
+  exp: {
+    compras:      { label: '🛒 Compras', color: '#ef4444' },
+    prestamos:    { label: '🤝 Préstamos', color: '#f59e0b' },
+    deuda:        { label: '💳 Deuda', color: '#f97316' },
+    servicios:    { label: '🔧 Servicios', color: '#3b82f6' },
+    otros:        { label: '📌 Otros', color: '#64748b' },
+    alquiler:     { label: '🏠 Alquiler/Renta', color: '#ea580c' },
+    internet:     { label: '📡 Internet/Teléfono', color: '#06b6d4' },
+    mercado:      { label: '🛒 Mercado/Despensa', color: '#16a34a' },
+    comida_fuera: { label: '🍽️ Comida fuera', color: '#ec4899' },
+    delivery:     { label: '🛵 Delivery', color: '#d97706' },
+    transporte:   { label: '🚗 Transporte', color: '#8b5cf6' },
+    salud:        { label: '🏥 Salud/Medicinas', color: '#dc2626' },
+    educacion:    { label: '📚 Educación', color: '#2563eb' },
+    entrete:      { label: '🎬 Entretenimiento', color: '#a78bfa' },
+    ropa:         { label: '👕 Ropa/Calzado', color: '#f97316' },
+    manten:       { label: '🔧 Mantenimiento', color: '#64748b' },
+    deudas_pago:  { label: '💳 Pago de deudas', color: '#ef4444' },
+    ahorro:       { label: '🏦 Ahorro', color: '#22c55e' },
+    otros_exp:    { label: '📌 Otros gastos', color: '#94a3b8' },
+  }
 };
+
+// Mapas de compatibilidad (usados por código legado — se reconstruyen desde globalCats)
+let CAT_ALL = {}, HOME_CATS_INC = {}, HOME_CATS_EXP = {}, HOME_CATS_ALL = {};
+function rebuildLegacyCatMaps() {
+  CAT_ALL = {}; HOME_CATS_INC = {}; HOME_CATS_EXP = {}; HOME_CATS_ALL = {};
+  Object.entries(globalCats.inc).forEach(([k,v])=>{ CAT_ALL[k]=v.label; HOME_CATS_INC[k]=v.label; HOME_CATS_ALL[k]=v.label; });
+  Object.entries(globalCats.exp).forEach(([k,v])=>{ CAT_ALL[k]=v.label; HOME_CATS_EXP[k]=v.label; HOME_CATS_ALL[k]=v.label; });
+}
+rebuildLegacyCatMaps();
+function rebuildHomeCatsAll() { rebuildLegacyCatMaps(); }
 
 // Home Billings — moneda local
 // Cambia HOME_CURR a tu moneda: 'RD$', 'MXN$', '€', '$', etc.
 let HOME_CURR = 'L ';
 
-let HOME_CATS_INC = {
-  salario:    '💼 Salario',
-  pension:    '🏦 Pensión/Beneficio',
-  freelance:  '💻 Freelance/Extra',
-  renta_inc:  '🏠 Renta recibida',
-  bono:       '🎁 Bono/Premio',
-  otros_inc:  '📌 Otros ingresos'
-};
-let HOME_CATS_EXP = {
-  alquiler:    '🏠 Alquiler/Renta',
-  servicios:   '💡 Servicios (luz/agua/gas)',
-  internet:    '📡 Internet/Teléfono',
-  mercado:     '🛒 Mercado/Despensa',
-  comida_fuera:'🍽️ Comida fuera/Restaurantes',
-  delivery:    '🛵 Delivery/Pedidos en línea',
-  comida_rap:  '🍔 Comida rápida',
-  transporte:  '🚗 Transporte',
-  salud:       '🏥 Salud/Medicinas',
-  educacion:   '📚 Educación',
-  entrete:     '🎬 Entretenimiento',
-  ropa:        '👕 Ropa/Calzado',
-  manten:      '🔧 Mantenimiento/Reparación',
-  deudas_pago: '💳 Pago de deudas',
-  ahorro:      '🏦 Ahorro',
-  otros_exp:   '📌 Otros gastos'
-};
-let HOME_CATS_ALL = { ...HOME_CATS_INC, ...HOME_CATS_EXP };
-
-function rebuildHomeCatsAll() {
-  HOME_CATS_ALL = { ...HOME_CATS_INC, ...HOME_CATS_EXP };
-}
-
 function fmtH(v) {
   return HOME_CURR + (v||0).toLocaleString('es', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
-function homeCatLabel(k) { return HOME_CATS_ALL[k] || k; }
-function catLabel(k)     { return CAT_ALL[k] || k; }
+function catLabel(k)     { return (globalCats.inc[k] || globalCats.exp[k])?.label || k; }
+function homeCatLabel(k) { return catLabel(k); }
 
 // ============================================================
 // DATOS — vacío (plantilla limpia)
@@ -1451,13 +1492,23 @@ function initFromDrive(data) {
   // Cargar config (categorías, usuarios, menús)
   if (data && data.config) {
     const c = data.config;
-    if (c.catAll)      CAT_ALL        = c.catAll;
-    if (c.homeCatsInc) HOME_CATS_INC  = c.homeCatsInc;
-    if (c.homeCatsExp) HOME_CATS_EXP  = c.homeCatsExp;
-    if (c.homeCurr)    HOME_CURR      = c.homeCurr;
-    if (c.catColors)     catColors     = c.catColors;
-    if (c.homeCatColors) homeCatColors = c.homeCatColors;
-    rebuildHomeCatsAll();
+    if (c.globalCats) {
+      // Nuevo formato
+      globalCats = c.globalCats;
+    } else {
+      // Migración desde formato antiguo
+      if (c.homeCatsInc) Object.entries(c.homeCatsInc).forEach(([k,lbl])=>{ if (!globalCats.inc[k]) globalCats.inc[k]={label:lbl,color:'#22c55e'}; });
+      if (c.homeCatsExp) Object.entries(c.homeCatsExp).forEach(([k,lbl])=>{ if (!globalCats.exp[k]) globalCats.exp[k]={label:lbl,color:'#ef4444'}; });
+      if (c.catAll)      Object.entries(c.catAll).forEach(([k,lbl])=>{ if (!globalCats.inc[k]&&!globalCats.exp[k]) globalCats.exp[k]={label:lbl,color:'#64748b'}; });
+      // Aplicar colores guardados
+      const cc = {...(c.catColors||{}), ...(c.homeCatColors||{})};
+      Object.entries(cc).forEach(([k,col])=>{
+        const gc = globalCats.inc[k] || globalCats.exp[k];
+        if (gc) gc.color = col;
+      });
+    }
+    if (c.homeCurr) HOME_CURR = c.homeCurr;
+    rebuildLegacyCatMaps();
     if (c.users && c.users.length)        { users = c.users; nextUserId = Math.max(...users.map(u=>u.id))+1; }
     if (c.customMenus && c.customMenus.length) {
       customMenus = c.customMenus;
@@ -1470,8 +1521,7 @@ function initFromDrive(data) {
   try {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{catAll:CAT_ALL,homeCatsInc:HOME_CATS_INC,homeCatsExp:HOME_CATS_EXP,
-              homeCurr:HOME_CURR,users:users,customMenus:customMenus,catColors:catColors,homeCatColors:homeCatColors}
+      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus}
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
@@ -1496,8 +1546,7 @@ function pushToDrive() {
     version: 1,
     lastUpdated: new Date().toISOString(),
     config: {
-      catAll:CAT_ALL, homeCatsInc:HOME_CATS_INC, homeCatsExp:HOME_CATS_EXP,
-      homeCurr:HOME_CURR, users:users, customMenus:menusPayload, catColors:catColors, homeCatColors:homeCatColors
+      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload
     },
     transactions:txs, deudas:deudas, home:homeTxs
   };
@@ -1710,19 +1759,26 @@ function renderChartMonthly() {
 }
 
 function getCatColor(key, idx) {
-  return catColors[key] || DEFAULT_CAT_COLORS[idx % DEFAULT_CAT_COLORS.length];
+  const cat = globalCats.inc[key] || globalCats.exp[key];
+  if (cat && cat.color) return cat.color;
+  return catColors[key] || DEFAULT_CAT_COLORS[(idx||0) % DEFAULT_CAT_COLORS.length];
 }
-function getHomeCatColor(key, idx) {
-  return homeCatColors[key] || DEFAULT_CAT_COLORS[idx % DEFAULT_CAT_COLORS.length];
-}
-// Helpers usados por los handlers inline del modal
+function getHomeCatColor(key, idx) { return getCatColor(key, idx); }
+
+// Helpers usados por los handlers inline del modal de colores (chart)
 function _setCatColor(key, val) {
-  if (_catModalSource === 'home') { homeCatColors[key] = val; try{renderHome();}catch(e){} }
-  else { catColors[key] = val; refreshAllCatCharts(); }
+  const cat = globalCats.inc[key] || globalCats.exp[key];
+  if (cat) cat.color = val;
+  else catColors[key] = val;
+  refreshAllCatCharts();
+  try { renderHome(); } catch(e) {}
 }
 function _delCatColor(key, defColor) {
-  if (_catModalSource === 'home') { delete homeCatColors[key]; try{renderHome();}catch(e){} }
-  else { delete catColors[key]; refreshAllCatCharts(); }
+  const cat = globalCats.inc[key] || globalCats.exp[key];
+  if (cat) cat.color = defColor;
+  else delete catColors[key];
+  refreshAllCatCharts();
+  try { renderHome(); } catch(e) {}
   const inp = document.querySelector('#catcolors-body input[data-key="'+key+'"]');
   if (inp) inp.value = defColor;
   scheduleSave();
@@ -1846,11 +1902,10 @@ function populateCatFilter() {
   const sel = document.getElementById('f-cat');
   if (!sel) return;
   const prev = sel.value;
-  sel.innerHTML = '<option value="">Todas las categorías</option>';
-  Object.entries(CAT_ALL).forEach(([k,v])=>{
-    sel.innerHTML += `<option value="${k}">${v}</option>`;
-  });
-  if (CAT_ALL[prev]) sel.value = prev;
+  sel.innerHTML = '<option value="">Todas las categorías</option>'
+    + Object.entries(globalCats.inc).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')
+    + Object.entries(globalCats.exp).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  if ((globalCats.inc[prev]||globalCats.exp[prev])) sel.value = prev;
 }
 
 function renderHistory() {
@@ -1946,40 +2001,31 @@ function renderBalance() {
 // ============================================================
 function updateCatOptions() {
   const sel = document.getElementById('tx-cat');
+  if (!sel) return;
   const prev = sel.value;
-  sel.innerHTML = Object.entries(CAT_ALL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
-  if (CAT_ALL[prev]) sel.value = prev;
+  const type = document.getElementById('tx-type')?.value;
+  const cats = type === 'income' ? globalCats.inc : globalCats.exp;
+  sel.innerHTML = Object.entries(cats).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+  if (cats[prev]) sel.value = prev;
   updateTxColorPicker();
 }
 
 function updateTxColorPicker() {
-  const type = document.getElementById('tx-type').value;
   const row  = document.getElementById('tx-color-row');
   const inp  = document.getElementById('tx-cat-color');
   if (!row || !inp) return;
-  if (type === 'expense') {
-    row.style.display = '';
-    const cat = document.getElementById('tx-cat').value;
-    const idx = Object.keys(CAT_ALL).indexOf(cat);
-    inp.value = catColors[cat] || DEFAULT_CAT_COLORS[Math.max(0,idx) % DEFAULT_CAT_COLORS.length];
-  } else {
-    row.style.display = 'none';
-  }
+  row.style.display = '';
+  const cat = document.getElementById('tx-cat').value;
+  inp.value = getCatColor(cat, 0);
 }
 
 function updateHomeTxColorPicker() {
-  const type = document.getElementById('home-tx-type').value;
   const row  = document.getElementById('home-color-row');
   const inp  = document.getElementById('home-cat-color');
   if (!row || !inp) return;
-  if (type === 'expense') {
-    row.style.display = '';
-    const cat = document.getElementById('home-tx-cat').value;
-    const idx = Object.keys(HOME_CATS_EXP).indexOf(cat);
-    inp.value = homeCatColors[cat] || DEFAULT_CAT_COLORS[Math.max(0,idx) % DEFAULT_CAT_COLORS.length];
-  } else {
-    row.style.display = 'none';
-  }
+  row.style.display = '';
+  const cat = document.getElementById('home-tx-cat').value;
+  inp.value = getCatColor(cat, 0);
 }
 
 function openTxModal(id) {
@@ -2041,10 +2087,12 @@ function saveTx() {
     txs.push({id:nextId++,date,amount,description:desc,type,category:cat,notes});
   }
 
-  // Guardar color de categoría si es gasto
-  if (type === 'expense') {
-    const colorInp = document.getElementById('tx-cat-color');
-    if (colorInp) catColors[cat] = colorInp.value;
+  // Guardar color de categoría en globalCats
+  const colorInp = document.getElementById('tx-cat-color');
+  if (colorInp) {
+    const gc = globalCats.inc[cat] || globalCats.exp[cat];
+    if (gc) gc.color = colorInp.value;
+    else catColors[cat] = colorInp.value; // fallback para cats no reconocidas
   }
 
   closeTxModal();
@@ -2152,10 +2200,9 @@ function switchView(el) {
 function populateHomeCatFilter() {
   const sel = document.getElementById('hf-cat');
   if (!sel) return;
-  sel.innerHTML = '<option value="">Todas las categorías</option>';
-  Object.entries(HOME_CATS_ALL).forEach(([k,v]) => {
-    sel.innerHTML += `<option value="${k}">${v}</option>`;
-  });
+  sel.innerHTML = '<option value="">Todas las categorías</option>'
+    + Object.entries(globalCats.inc).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')
+    + Object.entries(globalCats.exp).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
   // label de moneda en header y modal
   const lbl = document.getElementById('home-curr-label');
   if (lbl) lbl.textContent = HOME_CURR.trim();
@@ -2165,10 +2212,11 @@ function populateHomeCatFilter() {
 
 function updateHomeCatOptions() {
   const type = document.getElementById('home-tx-type').value;
-  const cats = type === 'income' ? HOME_CATS_INC : HOME_CATS_EXP;
+  const cats = type === 'income' ? globalCats.inc : globalCats.exp;
   const sel = document.getElementById('home-tx-cat');
+  if (!sel) return;
   const prev = sel.value;
-  sel.innerHTML = Object.entries(cats).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+  sel.innerHTML = Object.entries(cats).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
   if (cats[prev]) sel.value = prev;
   updateHomeTxColorPicker();
 }
@@ -3144,11 +3192,36 @@ function renderMenusList() {
     </div>`).join('');
 }
 
+// Helpers para el selector de moneda en el form de menú
+function updateMenuCurrField(val) {
+  const inp = document.getElementById('mf-curr');
+  if (val === 'custom') { inp.style.display=''; inp.value=''; inp.focus(); }
+  else { inp.style.display='none'; inp.value=val; }
+}
+function getMenuCurrValue() {
+  const sel = document.getElementById('mf-curr-sel');
+  if (!sel) return '$';
+  return sel.value === 'custom'
+    ? (document.getElementById('mf-curr').value.trim() || '$')
+    : sel.value;
+}
+function setMenuCurrUI(currVal) {
+  const sel = document.getElementById('mf-curr-sel');
+  const inp = document.getElementById('mf-curr');
+  if (!sel || !inp) return;
+  const known = Array.from(sel.options).map(o=>o.value).filter(v=>v!=='custom');
+  if (known.includes(currVal)) {
+    sel.value = currVal; inp.style.display='none'; inp.value=currVal;
+  } else {
+    sel.value = 'custom'; inp.style.display=''; inp.value=currVal;
+  }
+}
+
 function resetMenuForm() {
   document.getElementById('mf-id').value='';
   document.getElementById('mf-icon').value='📂';
   document.getElementById('mf-name').value='';
-  document.getElementById('mf-curr').value='$';
+  setMenuCurrUI('$');
   document.getElementById('mf-pin').value='';
   document.getElementById('mf-access').value='viewer';
   document.getElementById('menu-form-title').textContent='+ Nuevo menú';
@@ -3160,7 +3233,7 @@ function editCustomMenuAdmin(id) {
   document.getElementById('mf-id').value=m.id;
   document.getElementById('mf-icon').value=m.icon;
   document.getElementById('mf-name').value=m.name;
-  document.getElementById('mf-curr').value=m.currency;
+  setMenuCurrUI(m.currency || '$');
   document.getElementById('mf-pin').value=m.pin||'';
   document.getElementById('mf-access').value=m.access||'viewer';
   document.getElementById('menu-form-title').textContent='✏️ Editando: '+m.name;
@@ -3170,7 +3243,7 @@ function saveCustomMenu() {
   const id     = document.getElementById('mf-id').value;
   const icon   = document.getElementById('mf-icon').value.trim() || '📂';
   const name   = document.getElementById('mf-name').value.trim();
-  const curr   = document.getElementById('mf-curr').value.trim() || '$';
+  const curr   = getMenuCurrValue();
   const pin    = document.getElementById('mf-pin').value;
   const access = document.getElementById('mf-access').value;
   if (!name) { alert('El nombre del menú es requerido.'); return; }
@@ -3208,12 +3281,12 @@ document.getElementById('tx-modal').addEventListener('click', function(e) {
 // ============================================================
 // GESTIÓN DE CATEGORÍAS
 // ============================================================
-let currentCatsTab = 'zelle'; // 'zelle' | 'home-inc' | 'home-exp' | 'config'
+let currentCatsTab = 'inc'; // 'inc' | 'exp' | 'config'
 
-function openCatsModal() {
-  currentCatsTab = 'zelle';
+function openCatsModal(tab) {
+  currentCatsTab = tab || 'inc';
   resetCatForm();
-  renderCatsList();
+  switchCatsTab(currentCatsTab);
   document.getElementById('cats-modal').classList.add('open');
 }
 
@@ -3229,7 +3302,6 @@ function switchCatsTab(tab) {
   currentCatsTab = tab;
   document.querySelectorAll('.cats-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   resetCatForm();
-  // Mostrar/ocultar panel config vs lista+form
   const isConfig = tab === 'config';
   document.getElementById('cats-list-wrap').style.display = isConfig ? 'none' : 'block';
   document.getElementById('cats-form').style.display      = isConfig ? 'none' : 'block';
@@ -3242,10 +3314,7 @@ function switchCatsTab(tab) {
 }
 
 function currentCatObj() {
-  if (currentCatsTab === 'zelle')    return CAT_ALL;
-  if (currentCatsTab === 'home-inc') return HOME_CATS_INC;
-  if (currentCatsTab === 'home-exp') return HOME_CATS_EXP;
-  return {};
+  return globalCats[currentCatsTab] || globalCats.exp;
 }
 
 function renderCatsList() {
@@ -3257,21 +3326,25 @@ function renderCatsList() {
     return;
   }
   wrap.innerHTML = entries.map(([k, v]) => `
-    <div class="cat-row">
-      <span class="cat-row-label">${v}</span>
-      <span class="cat-row-key">${k}</span>
-      <div class="cat-row-actions">
-        <button onclick="editCatEntry('${k}')">✏️</button>
-        <button onclick="deleteCatEntry('${k}')" style="color:var(--red)">🗑</button>
-      </div>
+    <div class="cat-row" style="display:flex;align-items:center;gap:8px;padding:8px 6px;border-bottom:1px solid var(--border)">
+      <span style="width:20px;height:20px;border-radius:50%;background:${v.color};flex-shrink:0;display:inline-block;border:2px solid var(--bg2)"></span>
+      <span class="cat-row-label" style="flex:1;font-size:.85rem">${v.label}</span>
+      <span class="cat-row-key" style="font-size:.72rem;color:var(--text2);background:var(--bg3);padding:1px 7px;border-radius:99px">${k}</span>
+      <input type="color" value="${v.color}" title="Cambiar color"
+        onchange="globalCats['${currentCatsTab}']['${k}'].color=this.value;renderCatsList();rebuildLegacyCatMaps();refreshAllCatCharts();try{renderHome();}catch(e){}scheduleSave();"
+        style="width:26px;height:26px;border:none;background:none;cursor:pointer;border-radius:4px;padding:0;flex-shrink:0">
+      <button onclick="editCatEntry('${k}')" style="background:none;border:none;cursor:pointer;font-size:.85rem;padding:2px 5px" title="Editar">✏️</button>
+      <button onclick="deleteCatEntry('${k}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:.85rem;padding:2px 5px" title="Eliminar">🗑</button>
     </div>`).join('');
 }
 
 function editCatEntry(key) {
   const obj = currentCatObj();
-  document.getElementById('cat-edit-key').value = key;
+  const entry = obj[key];
+  document.getElementById('cat-edit-key').value  = key;
   document.getElementById('cat-new-key').value   = key;
-  document.getElementById('cat-new-label').value = obj[key] || '';
+  document.getElementById('cat-new-label').value = entry?.label || '';
+  document.getElementById('cat-new-color').value = entry?.color || '#3b82f6';
   document.getElementById('cats-form-title').textContent = '✏️ Editando: ' + key;
   document.getElementById('cat-new-key').focus();
 }
@@ -3280,36 +3353,31 @@ function resetCatForm() {
   document.getElementById('cat-edit-key').value  = '';
   document.getElementById('cat-new-key').value   = '';
   document.getElementById('cat-new-label').value = '';
+  const colorEl = document.getElementById('cat-new-color');
+  if (colorEl) colorEl.value = currentCatsTab === 'inc' ? '#22c55e' : '#ef4444';
   document.getElementById('cats-form-title').textContent = '+ Nueva categoría';
 }
 
 function saveCatEntry() {
-  const editKey   = document.getElementById('cat-edit-key').value.trim();
-  const newKey    = document.getElementById('cat-new-key').value.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
-  const newLabel  = document.getElementById('cat-new-label').value.trim();
+  const editKey  = document.getElementById('cat-edit-key').value.trim();
+  const newKey   = document.getElementById('cat-new-key').value.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+  const newLabel = document.getElementById('cat-new-label').value.trim();
+  const newColor = document.getElementById('cat-new-color').value || '#3b82f6';
 
-  if (!newKey || !newLabel) {
-    alert('Completa clave y nombre.');
-    return;
-  }
+  if (!newKey || !newLabel) { alert('Completa clave y nombre.'); return; }
 
   const obj = currentCatObj();
 
-  // Si editamos y la clave cambió, eliminar la vieja
+  // Si la clave cambió, migrar transacciones
   if (editKey && editKey !== newKey) {
     delete obj[editKey];
-    // Si hay transacciones que usaban la clave vieja, migrarlas
-    if (currentCatsTab === 'zelle') {
-      txs.forEach(t => { if (t.category === editKey) t.category = newKey; });
-    } else {
-      homeTxs.forEach(t => { if (t.category === editKey) t.category = newKey; });
-    }
+    txs.forEach(t     => { if (t.category === editKey) t.category = newKey; });
+    homeTxs.forEach(t => { if (t.category === editKey) t.category = newKey; });
+    customMenus.forEach(m => m.data?.forEach(t => { if (t.category === editKey) t.category = newKey; }));
   }
 
-  obj[newKey] = newLabel;
-
-  if (currentCatsTab !== 'zelle') rebuildHomeCatsAll();
-
+  obj[newKey] = { label: newLabel, color: newColor };
+  rebuildLegacyCatMaps();
   resetCatForm();
   renderCatsList();
   populateCatFilter();
@@ -3321,10 +3389,10 @@ function saveCatEntry() {
 }
 
 function deleteCatEntry(key) {
-  if (!confirm('¿Eliminar la categoría "' + key + '"? Las transacciones que la usen quedarán con clave sin nombre.')) return;
+  if (!confirm('¿Eliminar la categoría "' + key + '"?')) return;
   const obj = currentCatObj();
   delete obj[key];
-  if (currentCatsTab !== 'zelle') rebuildHomeCatsAll();
+  rebuildLegacyCatMaps();
   renderCatsList();
   populateCatFilter();
   updateCatOptions();
