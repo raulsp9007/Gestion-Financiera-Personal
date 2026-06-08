@@ -837,7 +837,7 @@
       <div class="cards" id="home-cards"></div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos (hogar)</h3><canvas id="chart-home-monthly"></canvas></div>
-        <div class="chart-box"><h3>Gastos por categoría</h3><canvas id="chart-home-cat"></canvas></div>
+        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="chart-home-cat"></canvas></div>
       </div>
       <button class="filter-toggle-btn" onclick="toggleFilters('home-filters','hf-search','hf-type','hf-cat','hf-month')">
         🔍 Buscar y filtrar
@@ -2707,7 +2707,7 @@ function buildCustomMenuViews() {
       <div class="cards" id="cm-cards-${m.id}"></div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos</h3><canvas id="cm-chart-monthly-${m.id}"></canvas></div>
-        <div class="chart-box"><h3>Gastos por categoría</h3><canvas id="cm-chart-cat-${m.id}"></canvas></div>
+        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="cm-chart-cat-${m.id}"></canvas></div>
       </div>
       <button class="filter-toggle-btn" onclick="toggleFilters('cmf-filters-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-month-${m.id}')">
         🔍 Buscar y filtrar
