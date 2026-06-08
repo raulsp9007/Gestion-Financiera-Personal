@@ -998,7 +998,14 @@
       </div>
       <div class="form-row">
         <label>Categoría</label>
-        <select id="tx-cat"></select>
+        <select id="tx-cat" onchange="updateTxColorPicker()"></select>
+      </div>
+    </div>
+    <div class="form-row" id="tx-color-row" style="display:none">
+      <label>Color en gráfico</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="color" id="tx-cat-color" style="width:40px;height:36px;border:1px solid var(--border);border-radius:8px;padding:2px;background:var(--bg);cursor:pointer">
+        <span style="font-size:.78rem;color:var(--text2)">Color del pastel para esta categoría</span>
       </div>
     </div>
     <div class="form-row">
@@ -1042,7 +1049,14 @@
       </div>
       <div class="form-row">
         <label>Categoría</label>
-        <select id="home-tx-cat"></select>
+        <select id="home-tx-cat" onchange="updateHomeTxColorPicker()"></select>
+      </div>
+    </div>
+    <div class="form-row" id="home-color-row" style="display:none">
+      <label>Color en gráfico</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="color" id="home-cat-color" style="width:40px;height:36px;border:1px solid var(--border);border-radius:8px;padding:2px;background:var(--bg);cursor:pointer">
+        <span style="font-size:.78rem;color:var(--text2)">Color del pastel para esta categoría</span>
       </div>
     </div>
     <div class="form-row">
@@ -1928,6 +1942,37 @@ function updateCatOptions() {
   const prev = sel.value;
   sel.innerHTML = Object.entries(CAT_ALL).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   if (CAT_ALL[prev]) sel.value = prev;
+  updateTxColorPicker();
+}
+
+function updateTxColorPicker() {
+  const type = document.getElementById('tx-type').value;
+  const row  = document.getElementById('tx-color-row');
+  const inp  = document.getElementById('tx-cat-color');
+  if (!row || !inp) return;
+  if (type === 'expense') {
+    row.style.display = '';
+    const cat = document.getElementById('tx-cat').value;
+    const idx = Object.keys(CAT_ALL).indexOf(cat);
+    inp.value = catColors[cat] || DEFAULT_CAT_COLORS[Math.max(0,idx) % DEFAULT_CAT_COLORS.length];
+  } else {
+    row.style.display = 'none';
+  }
+}
+
+function updateHomeTxColorPicker() {
+  const type = document.getElementById('home-tx-type').value;
+  const row  = document.getElementById('home-color-row');
+  const inp  = document.getElementById('home-cat-color');
+  if (!row || !inp) return;
+  if (type === 'expense') {
+    row.style.display = '';
+    const cat = document.getElementById('home-tx-cat').value;
+    const idx = Object.keys(HOME_CATS_EXP).indexOf(cat);
+    inp.value = homeCatColors[cat] || DEFAULT_CAT_COLORS[Math.max(0,idx) % DEFAULT_CAT_COLORS.length];
+  } else {
+    row.style.display = 'none';
+  }
 }
 
 function openTxModal(id) {
@@ -1947,6 +1992,7 @@ function openTxModal(id) {
     updateCatOptions();
     document.getElementById('tx-cat').value = t.category;
     document.getElementById('tx-notes').value = t.notes || '';
+    updateTxColorPicker();
     del.style.display = 'inline-flex';
   } else {
     document.getElementById('modal-title').textContent = 'Nueva transacción';
@@ -1986,6 +2032,12 @@ function saveTx() {
     if (idx >= 0) txs[idx] = {id:parseInt(id),date,amount,description:desc,type,category:cat,notes};
   } else {
     txs.push({id:nextId++,date,amount,description:desc,type,category:cat,notes});
+  }
+
+  // Guardar color de categoría si es gasto
+  if (type === 'expense') {
+    const colorInp = document.getElementById('tx-cat-color');
+    if (colorInp) catColors[cat] = colorInp.value;
   }
 
   closeTxModal();
@@ -2111,6 +2163,7 @@ function updateHomeCatOptions() {
   const prev = sel.value;
   sel.innerHTML = Object.entries(cats).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
   if (cats[prev]) sel.value = prev;
+  updateHomeTxColorPicker();
 }
 
 function renderHome() {
@@ -2212,6 +2265,7 @@ function openHomeTxModal(id) {
     updateHomeCatOptions();
     document.getElementById('home-tx-cat').value = t.category;
     document.getElementById('home-tx-notes').value = t.notes || '';
+    updateHomeTxColorPicker();
     del.style.display = 'inline-flex';
   } else {
     document.getElementById('home-modal-title').textContent = '🏠 Nueva entrada hogar';
@@ -2254,6 +2308,13 @@ function saveHomeTx() {
   } else {
     homeTxs.push({ id:nextHomeId++, date, amount, description:desc, type, category:cat, notes });
   }
+
+  // Guardar color de categoría si es gasto
+  if (type === 'expense') {
+    const colorInp = document.getElementById('home-cat-color');
+    if (colorInp) homeCatColors[cat] = colorInp.value;
+  }
+
   closeHomeTxModal();
   renderHome();
   scheduleSave();
