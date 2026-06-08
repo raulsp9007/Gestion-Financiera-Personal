@@ -1151,6 +1151,9 @@
         </div>
         <input type="hidden" id="uf-id">
       </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <button class="btn btn-ghost" onclick="invalidateAllSessions()" style="color:var(--red);border-color:var(--red);font-size:.82rem;width:100%">🚪 Cerrar todas las sesiones activas</button>
+      </div>
     </div>
 
     <!-- TAB MENÚS -->
@@ -1432,6 +1435,7 @@ let homeTxs = [];
 let users = [];        // [{id, name, password, role}]
 let customMenus = [];  // [{id, name, icon, currency, pin, access, catsInc, catsExp, data, nextId, charts}]
 let navOrder = [];     // ['dashboard','deudas','home','custom-1',...]
+let sessionSeed = ''; // token de invalidación global — si cambia, todas las sesiones expiran
 
 const STATIC_NAV = {
   dashboard: { label: 'Dashboard',     ico: '📊', view: 'view-dashboard' },
@@ -1547,6 +1551,8 @@ function initFromDrive(data) {
       nextMenuId = Math.max(...customMenus.map(m=>m.id))+1;
     }
     if (c.navOrder && c.navOrder.length) navOrder = c.navOrder;
+    if (c.sessionSeed) sessionSeed = c.sessionSeed;
+    else { sessionSeed = Date.now().toString(36); }
   }
   if (!data) scheduleSave();
 
@@ -1554,7 +1560,7 @@ function initFromDrive(data) {
   try {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder}
+      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,sessionSeed:sessionSeed}
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
@@ -1579,7 +1585,7 @@ function pushToDrive() {
     version: 1,
     lastUpdated: new Date().toISOString(),
     config: {
-      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder
+      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, sessionSeed:sessionSeed
     },
     transactions:txs, deudas:deudas, home:homeTxs
   };
@@ -2933,7 +2939,7 @@ const SESSION_KEY = 'cashmap_session';
 const SESSION_TTL = 24 * 60 * 60 * 1000; // 24h en ms
 
 function saveSession(user) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: user.id, loginTime: Date.now() }));
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: user.id, loginTime: Date.now(), seed: sessionSeed }));
 }
 
 function clearSession() {
@@ -2944,8 +2950,9 @@ function loadSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
-    const { userId, loginTime } = JSON.parse(raw);
+    const { userId, loginTime, seed } = JSON.parse(raw);
     if (Date.now() - loginTime > SESSION_TTL) { clearSession(); return null; }
+    if (seed !== sessionSeed) { clearSession(); return null; }
     return users.find(u => u.id === userId) || null;
   } catch(e) { clearSession(); return null; }
 }
@@ -2989,6 +2996,16 @@ function renderApp() {
   buildCustomMenuViews();
   renderNavForUser();
   renderAll();
+}
+
+function invalidateAllSessions() {
+  if (!confirm('¿Cerrar TODAS las sesiones activas? Todos los usuarios deberán iniciar sesión nuevamente.')) return;
+  sessionSeed = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  clearSession();
+  scheduleSave();
+  showToast('✅ Todas las sesiones cerradas');
+  currentUser = null;
+  initAuth();
 }
 
 function logout() {
