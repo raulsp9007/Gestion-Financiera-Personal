@@ -1094,14 +1094,8 @@
       <div style="display:flex;gap:6px;align-items:center">
         <select id="deuda-curr-sel" onchange="updateDeudaCurrField(this.value)" style="flex:1">
           <option value="$">🇺🇸 USD — $</option>
-          <option value="€">🇪🇺 EUR — €</option>
-          <option value="L">🇭🇳 HNL — L</option>
-          <option value="RD$">🇩🇴 DOP — RD$</option>
-          <option value="MXN$">🇲🇽 MXN — MXN$</option>
-          <option value="£">🇬🇧 GBP — £</option>
-          <option value="COP$">🇨🇴 COP — COP$</option>
-          <option value="Q">🇬🇹 GTQ — Q</option>
-          <option value="₡">🇨🇷 CRC — ₡</option>
+          <option value="Zelle">💸 Zelle</option>
+          <option value="CUP">🇨🇺 CUP</option>
           <option value="custom">✏️ Otra moneda...</option>
         </select>
         <input type="text" id="deuda-curr" placeholder="símbolo..." maxlength="6"
@@ -1284,14 +1278,8 @@
           <div style="display:flex;gap:6px;align-items:center">
             <select id="mf-curr-sel" onchange="updateMenuCurrField(this.value)" style="flex:1">
               <option value="$">🇺🇸 USD — $</option>
-              <option value="€">🇪🇺 EUR — €</option>
-              <option value="L">🇭🇳 HNL — L</option>
-              <option value="RD$">🇩🇴 DOP — RD$</option>
-              <option value="MXN$">🇲🇽 MXN — MXN$</option>
-              <option value="£">🇬🇧 GBP — £</option>
-              <option value="COP$">🇨🇴 COP — COP$</option>
-              <option value="Q">🇬🇹 GTQ — Q</option>
-              <option value="₡">🇨🇷 CRC — ₡</option>
+              <option value="Zelle">💸 Zelle</option>
+              <option value="CUP">🇨🇺 CUP</option>
               <option value="custom">✏️ Otra moneda...</option>
             </select>
             <input type="text" id="mf-curr" placeholder="símbolo..." maxlength="6"
@@ -1903,7 +1891,9 @@ function fmt(n) {
 }
 // Formatear con símbolo de moneda arbitrario (para deudas con moneda propia)
 function fmtD(n, sym) {
-  return (sym||'$') + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const s = sym || '$';
+  const sep = s.length > 1 ? ' ' : '';
+  return s + sep + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function fmtSigned(n) {
   return (n >= 0 ? '+' : '-') + fmt(n);
@@ -3840,7 +3830,7 @@ function updateDeudaCurrField(val) {
   else { inp.style.display='none'; inp.value=''; }
 }
 // Rellena el selector de moneda del modal de deuda a partir de un símbolo guardado
-const _KNOWN_CURRS = ['$','€','L','RD$','MXN$','£','COP$','Q','₡'];
+const _KNOWN_CURRS = ['$','Zelle','CUP'];
 function _setDeudaCurr(sym) {
   const sel = document.getElementById('deuda-curr-sel');
   const inp = document.getElementById('deuda-curr');
