@@ -949,7 +949,6 @@
           <option value="pagado">Pagado</option>
         </select>
       </div>
-      <div class="cards" id="deudas-cards"></div>
       <div class="tbl-wrap">
         <div class="tbl-header">
           <h3>Registro de deudas</h3>
@@ -1088,6 +1087,25 @@
           <option value="pendiente">⏳ Pendiente</option>
           <option value="pagado">✅ Pagado</option>
         </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Moneda</label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select id="deuda-curr-sel" onchange="updateDeudaCurrField(this.value)" style="flex:1">
+          <option value="$">🇺🇸 USD — $</option>
+          <option value="€">🇪🇺 EUR — €</option>
+          <option value="L">🇭🇳 HNL — L</option>
+          <option value="RD$">🇩🇴 DOP — RD$</option>
+          <option value="MXN$">🇲🇽 MXN — MXN$</option>
+          <option value="£">🇬🇧 GBP — £</option>
+          <option value="COP$">🇨🇴 COP — COP$</option>
+          <option value="Q">🇬🇹 GTQ — Q</option>
+          <option value="₡">🇨🇷 CRC — ₡</option>
+          <option value="custom">✏️ Otra moneda...</option>
+        </select>
+        <input type="text" id="deuda-curr" placeholder="símbolo..." maxlength="6"
+          style="width:80px;display:none;text-align:center" oninput="this.value=this.value.toUpperCase()">
       </div>
     </div>
     <div class="form-row">
@@ -1882,6 +1900,10 @@ window.onload = function() {
 // ============================================================
 function fmt(n) {
   return '$' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+// Formatear con símbolo de moneda arbitrario (para deudas con moneda propia)
+function fmtD(n, sym) {
+  return (sym||'$') + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function fmtSigned(n) {
   return (n >= 0 ? '+' : '-') + fmt(n);
@@ -2702,20 +2724,6 @@ function renderDeudas() {
   if (st) list = list.filter(d=>d.status===st);
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
-  // Calcular totales por estado (pendiente + parcial = aún tiene saldo)
-  const activas = d => d.status !== 'pagado';
-  const porCobrarRest = deudas.filter(d=>d.type==='por_cobrar'&&activas(d)).reduce((s,d)=>s+deudaRemaining(d),0);
-  const porPagarRest  = deudas.filter(d=>d.type==='por_pagar'&&activas(d)).reduce((s,d)=>s+deudaRemaining(d),0);
-  const cobrado       = deudas.filter(d=>d.type==='por_cobrar').reduce((s,d)=>s+(d.paid||0),0);
-  const yaPague       = deudas.filter(d=>d.type==='por_pagar').reduce((s,d)=>s+(d.paid||0),0);
-
-  document.getElementById('deudas-cards').innerHTML = `
-    <div class="card green"><div class="label">Por cobrar (restante)</div><div class="value">${fmt(porCobrarRest)}</div><div class="sub">${deudas.filter(d=>d.type==='por_cobrar'&&activas(d)).length} activa(s)</div></div>
-    <div class="card red"><div class="label">Por pagar (restante)</div><div class="value">${fmt(porPagarRest)}</div><div class="sub">${deudas.filter(d=>d.type==='por_pagar'&&activas(d)).length} activa(s)</div></div>
-    <div class="card blue"><div class="label">Total cobrado</div><div class="value">${fmt(cobrado)}</div><div class="sub">abonos recibidos</div></div>
-    <div class="card"><div class="label">Total pagado</div><div class="value" style="color:var(--text2)">${fmt(yaPague)}</div><div class="sub">abonos enviados</div></div>
-  `;
-
   document.getElementById('deudas-count').textContent = list.length + ' registro(s)';
   document.getElementById('deudas-tbody').innerHTML = list.length ? list.map(d=>{
     const remaining = deudaRemaining(d);
@@ -2723,19 +2731,20 @@ function renderDeudas() {
     const pct = d.amount>0 ? Math.min(100,(paid/d.amount*100)) : 0;
     const barCol = d.type==='por_cobrar'?'var(--green)':'var(--acc)';
     const hasPayments = d.payments && d.payments.length > 0;
+    const dc = d.currency || '$';
     return `
     <tr>
       <td>${d.date}</td>
       <td style="font-weight:600">${d.persona}</td>
       <td class="deuda-col-desc" style="font-size:.8rem;color:var(--text2)">${d.description||'—'}</td>
       <td><span class="badge ${d.type}">${d.type==='por_cobrar'?'Por cobrar':'Por pagar'}</span></td>
-      <td class="amount ${d.type}" style="font-weight:700">${fmt(d.amount)}</td>
+      <td class="amount ${d.type}" style="font-weight:700">${fmtD(d.amount,dc)}</td>
       <td>
         <div class="debt-prog-wrap">
-          <div class="debt-prog-text">${fmt(paid)} <span style="color:var(--text2)">/ ${fmt(d.amount)}</span></div>
+          <div class="debt-prog-text">${fmtD(paid,dc)} <span style="color:var(--text2)">/ ${fmtD(d.amount,dc)}</span></div>
           <div class="debt-prog-bar"><div class="debt-prog-fill" style="width:${pct.toFixed(1)}%;background:${barCol}"></div></div>
           <div class="debt-prog-pct">${pct.toFixed(0)}%</div>
-          ${remaining > 0 ? `<div class="debt-prog-rest">Restante: ${fmt(remaining)}</div>` : ''}
+          ${remaining > 0 ? `<div class="debt-prog-rest">Restante: ${fmtD(remaining,dc)}</div>` : ''}
         </div>
       </td>
       <td><span class="badge ${d.status}">${deudaStatusLabel(d)}</span></td>
@@ -2769,6 +2778,7 @@ function openDeudaModal(id) {
     document.getElementById('deuda-type').value = d.type;
     document.getElementById('deuda-status').value = d.status;
     document.getElementById('deuda-notes').value = d.notes || '';
+    _setDeudaCurr(d.currency || '$');
     del.style.display = 'inline-flex';
   } else {
     document.getElementById('deuda-modal-title').textContent = 'Nueva deuda';
@@ -2780,6 +2790,7 @@ function openDeudaModal(id) {
     document.getElementById('deuda-type').value = 'por_cobrar';
     document.getElementById('deuda-status').value = 'pendiente';
     document.getElementById('deuda-notes').value = '';
+    _setDeudaCurr('$');
     del.style.display = 'none';
   }
   modal.classList.add('open');
@@ -2799,6 +2810,10 @@ function saveDeuda() {
   const type = document.getElementById('deuda-type').value;
   const status = document.getElementById('deuda-status').value;
   const notes = document.getElementById('deuda-notes').value.trim();
+  const currSel = document.getElementById('deuda-curr-sel').value;
+  const currency = currSel === 'custom'
+    ? (document.getElementById('deuda-curr').value.trim() || '$')
+    : currSel;
 
   if (!date || isNaN(amount) || amount <= 0 || !persona) {
     alert('Por favor completa fecha, monto y persona.');
@@ -2809,10 +2824,10 @@ function saveDeuda() {
     // Edición: preservar pagos existentes, solo actualizar campos del encabezado
     const idx = deudas.findIndex(d=>d.id===parseInt(id));
     if (idx >= 0) {
-      deudas[idx] = { ...deudas[idx], date, amount, persona, description: desc, type, status, notes };
+      deudas[idx] = { ...deudas[idx], date, amount, persona, description: desc, type, status, notes, currency };
     }
   } else {
-    deudas.push({ id: nextDeudaId++, date, amount, persona, description: desc, type, status, notes, paid: 0, payments: [] });
+    deudas.push({ id: nextDeudaId++, date, amount, persona, description: desc, type, status, notes, currency, paid: 0, payments: [] });
   }
 
   closeDeudaModal();
@@ -3818,6 +3833,28 @@ function renderMenusList() {
 }
 
 // Helpers para el selector de moneda en el form de menú
+// Moneda por deuda — helpers del modal
+function updateDeudaCurrField(val) {
+  const inp = document.getElementById('deuda-curr');
+  if (val === 'custom') { inp.style.display=''; inp.value=''; inp.focus(); }
+  else { inp.style.display='none'; inp.value=''; }
+}
+// Rellena el selector de moneda del modal de deuda a partir de un símbolo guardado
+const _KNOWN_CURRS = ['$','€','L','RD$','MXN$','£','COP$','Q','₡'];
+function _setDeudaCurr(sym) {
+  const sel = document.getElementById('deuda-curr-sel');
+  const inp = document.getElementById('deuda-curr');
+  if (_KNOWN_CURRS.includes(sym)) {
+    sel.value = sym;
+    inp.style.display = 'none';
+    inp.value = '';
+  } else {
+    sel.value = 'custom';
+    inp.style.display = '';
+    inp.value = sym;
+  }
+}
+
 function updateMenuCurrField(val) {
   const inp = document.getElementById('mf-curr');
   if (val === 'custom') { inp.style.display=''; inp.value=''; inp.focus(); }
