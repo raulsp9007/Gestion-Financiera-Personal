@@ -3174,13 +3174,6 @@ function logout() {
   }
 }
 
-function openUserMenu() {
-  if (!currentUser) return;
-  const session = JSON.parse(localStorage.getItem(SESSION_KEY) || '{}');
-  const remaining = session.loginTime ? Math.max(0, Math.round((SESSION_TTL - (Date.now() - session.loginTime)) / 3600000)) : 0;
-  if (confirm(`Sesión: ${currentUser.name} (${currentUser.role})\nExpira en ~${remaining}h\n¿Cerrar sesión?`)) logout();
-}
-
 function applyRoleUI() {
   const isAdmin = !currentUser || currentUser.role === 'admin';
   const ab = document.getElementById('admin-btn');
@@ -3871,17 +3864,18 @@ function saveCatEntry() {
 }
 
 function deleteCatEntry(key) {
-  if (!confirm('¿Eliminar la categoría "' + key + '"?')) return;
-  const obj = currentCatObj();
-  delete obj[key];
-  rebuildLegacyCatMaps();
-  renderCatsList();
-  populateCatFilter();
-  updateCatOptions();
-  populateHomeCatFilter();
-  updateHomeCatOptions();
-  scheduleSave();
-  showToast('Categoría eliminada', 'var(--red)');
+  showConfirm('¿Eliminar la categoría "' + key + '"?', ()=>{
+    const obj = currentCatObj();
+    delete obj[key];
+    rebuildLegacyCatMaps();
+    renderCatsList();
+    populateCatFilter();
+    updateCatOptions();
+    populateHomeCatFilter();
+    updateHomeCatOptions();
+    scheduleSave();
+    showToast('Categoría eliminada', 'var(--red)');
+  }, {icon:'⚙️', okLabel:'Eliminar'});
 }
 
 function saveCurrencyConfig() {
