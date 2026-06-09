@@ -809,6 +809,7 @@
     </div>
     <div class="login-error" id="login-error"></div>
     <button class="btn btn-primary" onclick="doLogin()">Ingresar →</button>
+    <div id="login-last-mod" style="margin-top:14px;font-size:.72rem;color:var(--text2);text-align:center;opacity:.7"></div>
   </div>
 </div>
 
@@ -3226,6 +3227,12 @@ function initAuth() {
   sel.innerHTML = users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
   document.getElementById('login-pass').value = '';
   document.getElementById('login-error').textContent = '';
+  // Fecha de ultima modificacion del archivo (refleja ultimo deploy en GitHub Pages)
+  const lm = new Date(document.lastModified);
+  const lmStr = isNaN(lm.getTime()) ? '' :
+    lm.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}) + ' ' +
+    lm.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('login-last-mod').textContent = lmStr ? `Actualizado: ${lmStr}` : '';
   document.getElementById('login-screen').classList.remove('hidden');
 }
 
