@@ -118,6 +118,8 @@
   .ph-left .ph-dt{color:var(--text2);font-size:.71rem}
   .ph-left .ph-note{color:var(--text);margin-top:2px}
   .ph-amount{font-weight:700}
+  .ph-actions{display:flex;gap:2px;margin-left:8px;flex-shrink:0}
+  .ph-item.editing-highlight{background:rgba(59,130,246,.12);border-radius:6px}
   /* FILTERS */
   .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
   .filter-toggle-btn{display:none} /* visible solo en mobile */
@@ -1014,13 +1016,17 @@
   <div class="modal" style="width:500px">
     <h3 id="pago-modal-title">💸 Registrar Pago</h3>
     <input type="hidden" id="pago-deuda-id">
+    <input type="hidden" id="pago-edit-idx" value="-1">
     <div class="pago-ctx" id="pago-ctx"></div>
     <div id="pago-history-wrap" style="display:none">
       <div class="section-title" style="margin-bottom:8px">Pagos anteriores</div>
       <div class="pago-history" id="pago-history-list"></div>
     </div>
     <div id="pago-form-section">
-      <div class="section-title" style="margin:4px 0 12px">Nuevo pago</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 12px">
+        <div class="section-title" style="margin:0" id="pago-form-title">Nuevo pago</div>
+        <button class="btn btn-ghost btn-sm" id="pago-cancel-edit-btn" onclick="cancelEditPago()" style="display:none;font-size:.75rem">✕ Cancelar edición</button>
+      </div>
       <div class="form-grid">
         <div class="form-row">
           <label>Fecha y hora</label>
@@ -2859,20 +2865,16 @@ function openPagoModal(deudaId) {
     }
   `;
 
+  // Reset edit state
+  document.getElementById('pago-edit-idx').value = '-1';
+  cancelEditPago(true);
+
   // Historial de pagos anteriores (siempre visible si hay pagos)
   const payments = d.payments || [];
   const wrap = document.getElementById('pago-history-wrap');
   if (payments.length > 0) {
     wrap.style.display = 'block';
-    document.getElementById('pago-history-list').innerHTML = [...payments].reverse().map(p=>`
-      <div class="ph-item">
-        <div class="ph-left">
-          <div class="ph-dt">${p.datetime ? p.datetime.replace('T',' ') : p.date||''}</div>
-          <div class="ph-note">${p.notes||'Sin nota'}</div>
-        </div>
-        <div class="ph-amount ${d.type==='por_cobrar'?'income':'expense'}">${d.type==='por_cobrar'?'+':'-'}${fmt(p.amount)}</div>
-      </div>
-    `).join('');
+    renderPagoHistory(deudaId);
   } else {
     wrap.style.display = 'none';
   }
@@ -2899,10 +2901,11 @@ function closePagoModal() {
 }
 
 function savePago() {
-  const deudaId = parseInt(document.getElementById('pago-deuda-id').value);
+  const deudaId  = parseInt(document.getElementById('pago-deuda-id').value);
+  const editIdx  = parseInt(document.getElementById('pago-edit-idx').value);
   const datetime = document.getElementById('pago-datetime').value;
-  const amount = parseFloat(document.getElementById('pago-amount').value);
-  const notes = document.getElementById('pago-notes').value.trim();
+  const amount   = parseFloat(document.getElementById('pago-amount').value);
+  const notes    = document.getElementById('pago-notes').value.trim();
 
   if (!datetime || isNaN(amount) || amount <= 0) {
     alert('Por favor completa fecha/hora y monto.');
@@ -2912,31 +2915,129 @@ function savePago() {
   const idx = deudas.findIndex(d=>d.id===deudaId);
   if (idx < 0) return;
   const d = deudas[idx];
-
-  // Registrar el pago únicamente en la deuda (aislado del resto de la app)
   if (!d.payments) d.payments = [];
-  d.payments.push({ datetime, amount, notes });
-  d.paid = Math.round(((d.paid || 0) + amount) * 100) / 100;
 
-  // Verificar y actualizar estado automáticamente con precisión decimal
-  const totalDeuda   = Math.round(d.amount * 100) / 100;
-  const totalAbonado = Math.round(d.paid   * 100) / 100;
-
-  const wasActive = d.status !== 'pagado';
-  if (totalAbonado >= totalDeuda) {
-    d.status = 'pagado';
-    d.paid = totalDeuda; // ajustar por redondeo
-    if (wasActive) {
-      setTimeout(() => showToast('✅ ¡Deuda con ' + d.persona + ' saldada!'), 200);
-    }
-  } else if (totalAbonado > 0) {
-    d.status = 'parcial';
+  if (editIdx >= 0 && editIdx < d.payments.length) {
+    // MODO EDICIÓN — actualizar pago existente
+    d.payments[editIdx] = { datetime, amount, notes };
+  } else {
+    // MODO NUEVO — agregar pago
+    d.payments.push({ datetime, amount, notes });
   }
+
+  // Recalcular paid desde cero (fuente de verdad = array payments)
+  recalcDeudaPaid(d);
 
   closePagoModal();
   renderDeudas();   // garantía directa — tabla siempre actualiza
   renderAll();      // sincroniza dashboard y demás vistas
   scheduleSave();
+}
+
+// ── Recalcular d.paid y status desde el array payments ──────
+function recalcDeudaPaid(d) {
+  d.paid = Math.round(d.payments.reduce((s,p)=>s+p.amount,0)*100)/100;
+  const totalDeuda = Math.round(d.amount*100)/100;
+  const wasActive  = d.status !== 'pagado';
+  if (d.paid <= 0) {
+    d.status = 'pendiente';
+  } else if (d.paid >= totalDeuda) {
+    d.status = 'pagado';
+    d.paid   = totalDeuda;
+    if (wasActive) setTimeout(()=>showToast('✅ ¡Deuda con '+d.persona+' saldada!'),200);
+  } else {
+    d.status = 'parcial';
+  }
+}
+
+// ── Renderiza la lista de pagos con botones editar/eliminar ──
+function renderPagoHistory(deudaId) {
+  const d = deudas.find(x=>x.id===deudaId);
+  if (!d) return;
+  const payments = d.payments || [];
+  const amtClass = d.type==='por_cobrar' ? 'income' : 'expense';
+  const sign     = d.type==='por_cobrar' ? '+' : '-';
+  // Los mostramos más reciente primero, pero guardamos índice original
+  const indexed = payments.map((p,i)=>({...p,_idx:i})).reverse();
+  document.getElementById('pago-history-list').innerHTML = indexed.map(p=>`
+    <div class="ph-item" id="ph-item-${p._idx}">
+      <div class="ph-left">
+        <div class="ph-dt">${p.datetime ? p.datetime.replace('T',' ') : p.date||''}</div>
+        <div class="ph-note">${p.notes||'Sin nota'}</div>
+      </div>
+      <div class="ph-amount ${amtClass}">${sign}${fmt(p.amount)}</div>
+      <div class="ph-actions">
+        <button class="btn-icon" onclick="editPagoItem(${deudaId},${p._idx})" title="Editar pago" style="font-size:.85rem">✏️</button>
+        <button class="btn-icon" onclick="deletePagoItem(${deudaId},${p._idx})" title="Eliminar pago" style="font-size:.85rem;color:var(--red)">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+// ── Cargar pago en el form para editar ───────────────────────
+function editPagoItem(deudaId, pIdx) {
+  const d = deudas.find(x=>x.id===deudaId);
+  if (!d || !d.payments[pIdx]) return;
+  const p = d.payments[pIdx];
+
+  // Marcar el item
+  document.querySelectorAll('.ph-item').forEach(el=>el.classList.remove('editing-highlight'));
+  const el = document.getElementById('ph-item-'+pIdx);
+  if (el) el.classList.add('editing-highlight');
+
+  // Llenar el form
+  document.getElementById('pago-edit-idx').value   = pIdx;
+  document.getElementById('pago-datetime').value   = p.datetime || '';
+  document.getElementById('pago-amount').value     = p.amount;
+  document.getElementById('pago-notes').value      = p.notes || '';
+  document.getElementById('pago-form-title').textContent = '✏️ Editando pago';
+  document.getElementById('pago-save-btn').textContent   = 'Actualizar pago';
+  document.getElementById('pago-cancel-edit-btn').style.display = '';
+  // Asegurarse que el form esté visible
+  document.getElementById('pago-form-section').style.display = 'block';
+  document.getElementById('pago-save-btn').style.display = 'inline-flex';
+  // Scroll al form
+  document.getElementById('pago-form-section').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ── Cancelar edición, volver a modo nuevo ────────────────────
+function cancelEditPago(silent) {
+  document.getElementById('pago-edit-idx').value = '-1';
+  document.getElementById('pago-form-title').textContent = 'Nuevo pago';
+  document.getElementById('pago-save-btn').textContent   = 'Registrar pago';
+  document.getElementById('pago-cancel-edit-btn').style.display = 'none';
+  document.querySelectorAll('.ph-item').forEach(el=>el.classList.remove('editing-highlight'));
+  if (!silent) {
+    // Reset form fields to defaults
+    const deudaId = parseInt(document.getElementById('pago-deuda-id').value);
+    const d = deudas.find(x=>x.id===deudaId);
+    if (d) {
+      const remaining = Math.round(deudaRemaining(d)*100)/100;
+      const now = new Date();
+      const localDT = new Date(now - now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+      document.getElementById('pago-datetime').value = localDT;
+      document.getElementById('pago-amount').value   = remaining > 0 ? remaining.toFixed(2) : '';
+      document.getElementById('pago-notes').value    = '';
+    }
+  }
+}
+
+// ── Eliminar pago ────────────────────────────────────────────
+function deletePagoItem(deudaId, pIdx) {
+  const d = deudas.find(x=>x.id===deudaId);
+  if (!d || !d.payments[pIdx]) return;
+  const p = d.payments[pIdx];
+  showConfirm(`¿Eliminar pago de ${fmt(p.amount)}?`, ()=>{
+    d.payments.splice(pIdx, 1);
+    recalcDeudaPaid(d);
+    // Si estábamos editando ese pago, cancelar edición
+    const editIdx = parseInt(document.getElementById('pago-edit-idx').value);
+    if (editIdx === pIdx) cancelEditPago(true);
+    // Re-abrir modal con datos actualizados
+    openPagoModal(deudaId);
+    renderDeudas();
+    scheduleSave();
+    showToast('Pago eliminado', 'var(--red)');
+  }, {icon:'💸', okLabel:'Eliminar pago'});
 }
 
 // Click fuera de los modales para cerrar
