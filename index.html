@@ -1233,13 +1233,13 @@
           <div class="form-row" style="margin:0"><label style="font-size:.74rem">Contraseña</label><input type="password" id="uf-pass" placeholder="••••••"></div>
           <div class="form-row" style="margin:0">
             <label style="font-size:.74rem">Rol</label>
-            <select id="uf-role">
+            <select id="uf-role" onchange="onUfRoleChange()">
               <option value="admin">🔴 Admin (acceso total)</option>
               <option value="editor" selected>🔵 Editor (puede editar)</option>
               <option value="viewer">⚫ Viewer (solo lectura)</option>
             </select>
           </div>
-          <div class="form-row" style="margin:0"><label style="font-size:.74rem">Menús permitidos</label><div id="uf-menus-check" style="font-size:.75rem;color:var(--text2);padding-top:4px">Todos (por rol)</div></div>
+          <div class="form-row" style="margin:0"><label style="font-size:.74rem">Ocultar menús</label><div id="uf-menus-check" style="font-size:.75rem;color:var(--text2);padding-top:4px;max-height:120px;overflow-y:auto"></div></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px">
           <button class="btn btn-primary" onclick="saveUser()" style="font-size:.82rem">Guardar usuario</button>
@@ -3326,8 +3326,9 @@ function isReadOnly() {
 
 function renderNavForUser() {
   buildSidebarNav();
-  // Bottom-nav "Más" visible si hay custom menus accesibles
-  const accessible = customMenus.filter(m=>canAccess(m.access));
+  // Bottom-nav "Más" visible si hay custom menus accesibles y no ocultos
+  const hidden = (currentUser && currentUser.role !== 'admin') ? (currentUser.hiddenMenus || []) : [];
+  const accessible = customMenus.filter(m=>canAccess(m.access) && !hidden.includes('custom-'+m.id));
   const bnMore = document.getElementById('bn-more');
   if (bnMore) bnMore.style.display = accessible.length ? '' : 'none';
   buildMoreDrawer();
@@ -3339,10 +3340,12 @@ function renderNavForUser() {
 function buildSidebarNav() {
   const nav = document.getElementById('sidebar-nav');
   if (!nav) return;
+  const hidden = (currentUser && currentUser.role !== 'admin') ? (currentUser.hiddenMenus || []) : [];
   const allKeys = ['dashboard','deudas','home','balance',...customMenus.map(m=>'custom-'+m.id)];
   allKeys.forEach(k => { if (!navOrder.includes(k)) navOrder.push(k); });
   navOrder = navOrder.filter(k => allKeys.includes(k));
   nav.innerHTML = navOrder.map(key => {
+    if (hidden.includes(key)) return '';
     if (STATIC_NAV[key]) {
       const {label, ico, view} = STATIC_NAV[key];
       return `<a data-view="${view}" onclick="switchView(this)"><span class="ico">${ico}</span> ${label}</a>`;
@@ -3407,8 +3410,9 @@ function buildCustomMenuViews() {
 
 function buildMoreDrawer() {
   const drawer = document.getElementById('more-drawer');
+  const hidden = (currentUser && currentUser.role !== 'admin') ? (currentUser.hiddenMenus || []) : [];
   const orderedCustom = navOrder
-    .filter(k => k.startsWith('custom-'))
+    .filter(k => k.startsWith('custom-') && !hidden.includes(k))
     .map(k => customMenus.find(m => m.id === parseInt(k.replace('custom-',''))))
     .filter(m => m && canAccess(m.access));
   drawer.innerHTML = orderedCustom.map(m=>`
@@ -3657,7 +3661,7 @@ function switchAdminTab(tab) {
   document.getElementById('atab-users').style.display = tab==='users'?'':'none';
   document.getElementById('atab-menus').style.display = tab==='menus'?'':'none';
   document.getElementById('atab-nav-order').style.display = tab==='nav-order'?'':'none';
-  if (tab==='users') renderUsersList();
+  if (tab==='users') { renderUsersList(); renderHiddenMenusCheckboxes([]); }
   if (tab==='menus') renderMenusList();
   if (tab==='nav-order') renderNavOrderTab();
 }
@@ -3667,15 +3671,18 @@ function renderUsersList() {
   const wrap = document.getElementById('users-list');
   if (!users.length) { wrap.innerHTML='<div style="color:var(--text2);font-size:.82rem;padding:10px">Sin usuarios. Crea el primero abajo.</div>'; return; }
   const roles = {admin:'🔴 Admin',editor:'🔵 Editor',viewer:'⚫ Viewer'};
-  wrap.innerHTML = users.map(u=>`
+  wrap.innerHTML = users.map(u=>{
+    const hm = u.hiddenMenus && u.hiddenMenus.length;
+    return `
     <div class="cat-row">
       <span class="cat-row-label" style="font-weight:600">${u.name}</span>
-      <span class="cat-row-key">${roles[u.role]||u.role}</span>
+      <span class="cat-row-key">${roles[u.role]||u.role}${hm?` <span style="background:rgba(239,68,68,.15);color:var(--red);border-radius:4px;padding:1px 5px;font-size:.68rem;margin-left:4px">${hm} oculto${hm>1?'s':''}</span>`:''}</span>
       <div class="cat-row-actions">
         <button onclick="editUser(${u.id})">✏️</button>
         <button onclick="deleteUser(${u.id})" style="color:var(--red)">🗑</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function resetUserForm() {
@@ -3684,6 +3691,7 @@ function resetUserForm() {
   document.getElementById('uf-pass').value='';
   document.getElementById('uf-role').value='editor';
   document.getElementById('user-form-title').textContent='+ Nuevo usuario';
+  renderHiddenMenusCheckboxes([]);
 }
 
 function editUser(id) {
@@ -3694,6 +3702,7 @@ function editUser(id) {
   document.getElementById('uf-pass').value=u.password;
   document.getElementById('uf-role').value=u.role;
   document.getElementById('user-form-title').textContent='✏️ Editando: '+u.name;
+  renderHiddenMenusCheckboxes(u.hiddenMenus||[]);
 }
 
 function saveUser() {
@@ -3702,16 +3711,49 @@ function saveUser() {
   const pass = document.getElementById('uf-pass').value;
   const role = document.getElementById('uf-role').value;
   if (!name || !pass) { alert('Nombre y contraseña son requeridos.'); return; }
+  // Leer menús ocultos (checkboxes marcados). Admin ignora esta lista al navegar, pero se guarda igual.
+  const hiddenMenus = [...document.querySelectorAll('#uf-menus-check input[type=checkbox]:checked')].map(c=>c.value);
   if (id) {
     const idx = users.findIndex(u=>u.id===parseInt(id));
-    if (idx>=0) users[idx]={...users[idx],name,password:pass,role};
+    if (idx>=0) users[idx]={...users[idx],name,password:pass,role,hiddenMenus};
   } else {
-    users.push({id:nextUserId++,name,password:pass,role});
+    users.push({id:nextUserId++,name,password:pass,role,hiddenMenus});
   }
   resetUserForm();
   renderUsersList();
   scheduleSave();
   showToast('Usuario guardado ✅');
+}
+
+// Construye checkboxes de menús ocultables para el formulario de usuario.
+// hiddenList = array de keys actualmente ocultas para ese usuario.
+function renderHiddenMenusCheckboxes(hiddenList = []) {
+  const wrap = document.getElementById('uf-menus-check');
+  if (!wrap) return;
+  const role = document.getElementById('uf-role').value;
+  if (role === 'admin') {
+    wrap.innerHTML = '<span style="color:var(--text2);font-size:.72rem;font-style:italic">Admin ve todos los menús</span>';
+    return;
+  }
+  const allKeys = ['dashboard','deudas','home','balance',...customMenus.map(m=>'custom-'+m.id)];
+  const labelMap = {
+    dashboard: '📊 Dashboard',
+    deudas:    '💳 Deudas',
+    home:      '🏠 Home Billings',
+    balance:   '📈 Balance',
+    ...Object.fromEntries(customMenus.map(m=>[`custom-${m.id}`,`${m.icon} ${m.name}`]))
+  };
+  wrap.innerHTML = allKeys.map(key=>`
+    <label style="display:flex;align-items:center;gap:6px;font-size:.74rem;cursor:pointer;padding:2px 0;user-select:none">
+      <input type="checkbox" value="${key}" ${hiddenList.includes(key)?'checked':''} style="accent-color:var(--red)">
+      ${labelMap[key]||key}
+    </label>`).join('');
+}
+
+// Lllamado desde onchange del select de rol para preservar seleccion al cambiar rol.
+function onUfRoleChange() {
+  const current = [...document.querySelectorAll('#uf-menus-check input[type=checkbox]:checked')].map(c=>c.value);
+  renderHiddenMenusCheckboxes(current);
 }
 
 function deleteUser(id) {
