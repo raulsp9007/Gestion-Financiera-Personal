@@ -715,6 +715,7 @@
   .debt-prog-bar{height:4px;border-radius:2px;background:var(--bg3);overflow:hidden;margin-top:3px;width:100%}
   .debt-prog-fill{height:100%;border-radius:2px;transition:width .4s}
   .debt-prog-pct{font-size:.65rem;color:var(--text2);margin-top:1px}
+  .debt-prog-rest{font-size:.65rem;color:var(--text2);margin-top:1px;white-space:nowrap}
 
   /* A: Date separator rows */
   tr.date-sep td{background:rgba(148,163,184,.07);padding:5px 14px;font-size:.7rem;font-weight:700;color:var(--text2);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);border-top:1px solid var(--border)}
@@ -2733,6 +2734,7 @@ function renderDeudas() {
           <div class="debt-prog-text">${fmt(paid)} <span style="color:var(--text2)">/ ${fmt(d.amount)}</span></div>
           <div class="debt-prog-bar"><div class="debt-prog-fill" style="width:${pct.toFixed(1)}%;background:${barCol}"></div></div>
           <div class="debt-prog-pct">${pct.toFixed(0)}%</div>
+          ${remaining > 0 ? `<div class="debt-prog-rest">Restante: ${fmt(remaining)}</div>` : ''}
         </div>
       </td>
       <td><span class="badge ${d.status}">${deudaStatusLabel(d)}</span></td>
