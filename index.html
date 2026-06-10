@@ -931,9 +931,12 @@
       <div class="tbl-wrap">
         <div class="tbl-header">
           <h3>Historial completo</h3>
-          <span id="hist-count" style="font-size:.78rem;color:var(--text2)"></span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="hist-count" style="font-size:.78rem;color:var(--text2)"></span>
+            <button class="btn btn-ghost" onclick="openColConfig('history')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
+          </div>
         </div>
-        <div class="tbl-scroll"><table><thead><tr><th>Fecha</th><th>Monto</th><th>Descripción</th><th>Tipo</th><th>Categoría</th><th>Notas</th><th>Acciones</th></tr></thead>
+        <div class="tbl-scroll"><table><thead id="hist-thead"></thead>
         <tbody id="hist-tbody"></tbody></table></div>
       </div>
     </div>
@@ -971,9 +974,12 @@
       <div class="tbl-wrap">
         <div class="tbl-header">
           <h3>Registro de deudas</h3>
-          <span id="deudas-count" style="font-size:.78rem;color:var(--text2)"></span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="deudas-count" style="font-size:.78rem;color:var(--text2)"></span>
+            <button class="btn btn-ghost" onclick="openColConfig('deudas')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
+          </div>
         </div>
-        <div class="tbl-scroll"><table><thead><tr><th>Fecha</th><th>Persona</th><th class="deuda-col-desc">Descripción</th><th>Tipo</th><th>Total</th><th>Progreso</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <div class="tbl-scroll"><table><thead id="deudas-thead"></thead>
         <tbody id="deudas-tbody"></tbody></table></div>
       </div>
     </div>
@@ -1016,11 +1022,12 @@
       <div class="tbl-wrap">
         <div class="tbl-header">
           <h3>🏠 Registro del hogar <span class="home-curr" id="home-curr-label"></span></h3>
-          <span id="home-count" style="font-size:.78rem;color:var(--text2)"></span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="home-count" style="font-size:.78rem;color:var(--text2)"></span>
+            <button class="btn btn-ghost" onclick="openColConfig('home')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
+          </div>
         </div>
-        <div class="tbl-scroll"><table><thead><tr>
-          <th>Fecha</th><th>Monto</th><th>Descripción</th><th>Tipo</th><th>Categoría</th><th>Notas</th><th>Acciones</th>
-        </tr></thead>
+        <div class="tbl-scroll"><table><thead id="home-thead"></thead>
         <tbody id="home-tbody"></tbody></table></div>
       </div>
     </div>
@@ -1030,6 +1037,23 @@
 
   </div><!-- /content -->
 </div><!-- /main -->
+
+<!-- MODAL CONFIGURAR COLUMNAS -->
+<div class="modal-overlay" id="col-config-modal">
+  <div class="modal" style="width:340px;max-width:96vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3 id="col-config-title" style="margin:0">Columnas</h3>
+      <button class="btn btn-ghost" onclick="closeColConfigModal()" style="padding:4px 10px">✕</button>
+    </div>
+    <p style="font-size:.78rem;color:var(--text2);margin-bottom:14px">Reordena con ▲▼ u oculta columnas. Acciones siempre al final.</p>
+    <div id="col-config-list" style="max-height:300px;overflow-y:auto"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="resetColConfig()" style="margin-right:auto;font-size:.82rem">↺ Restablecer</button>
+      <button class="btn btn-ghost" onclick="closeColConfigModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveColConfigFromModal()">Aplicar</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL PAGO DE DEUDA -->
 <div class="modal-overlay" id="pago-modal">
@@ -1639,6 +1663,68 @@ const STATIC_NAV = {
   home:      { label: 'Home Billings', ico: '🏠', view: 'view-home'      },
   balance:   { label: 'Balance',       ico: '📈', view: 'view-balance'   },
 };
+// ── Column configuration per table ──────────────────────────────────────────
+// COL_DEFS: render functions for each column. 'actions' is always fixed-last, not in defs.
+// fn signatures: history/home/deudas receive the row object; custom receives (t, curr).
+const COL_DEFS = {
+  history: {
+    date:        { label: 'Fecha',       fn: t => `<td>${t.date}</td>` },
+    amount:      { label: 'Monto',       fn: t => `<td class="amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}${t.recurring?'<span class="rec-badge">🔄</span>':''}</td>` },
+    description: { label: 'Descripción', fn: t => `<td>${t.description}</td>` },
+    type:        { label: 'Tipo',        fn: t => `<td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>` },
+    category:    { label: 'Categoría',   fn: t => `<td>${renderCatDot(t.category)}${catLabel(t.category)}${renderBudgetBar(t.category, t.date)}</td>` },
+    notes:       { label: 'Notas',       fn: t => `<td>${renderNote(t.notes)}</td>` },
+  },
+  deudas: {
+    date:        { label: 'Fecha',       fn: d => `<td>${d.date}</td>` },
+    persona:     { label: 'Persona',     fn: d => `<td style="font-weight:600">${d.persona}</td>` },
+    description: { label: 'Descripción', fn: d => `<td class="deuda-col-desc" style="font-size:.8rem;color:var(--text2)">${d.description||'—'}</td>` },
+    type:        { label: 'Tipo',        fn: d => `<td><span class="badge ${d.type}">${d.type==='por_cobrar'?'Por cobrar':'Por pagar'}</span></td>` },
+    total:       { label: 'Total',       fn: d => { const dc=d.currency||'$'; return `<td class="amount ${d.type}" style="font-weight:700">${fmtD(d.amount,dc)}</td>`; } },
+    progress:    { label: 'Progreso',    fn: d => { const dc=d.currency||'$'; const paid=d.paid||0; const pct=d.amount>0?Math.min(100,paid/d.amount*100):0; const barCol=d.type==='por_cobrar'?'var(--green)':'var(--acc)'; const rem=deudaRemaining(d); return `<td><div class="debt-prog-wrap"><div class="debt-prog-text">${fmtD(paid,dc)} <span style="color:var(--text2)">/ ${fmtD(d.amount,dc)}</span></div><div class="debt-prog-bar"><div class="debt-prog-fill" style="width:${pct.toFixed(1)}%;background:${barCol}"></div></div><div class="debt-prog-pct">${pct.toFixed(0)}%</div>${rem>0?`<div class="debt-prog-rest">Restante: ${fmtD(rem,dc)}</div>`:''}</div></td>`; } },
+    status:      { label: 'Estado',      fn: d => `<td><span class="badge ${d.status}">${deudaStatusLabel(d)}</span></td>` },
+  },
+  home: {
+    date:        { label: 'Fecha',       fn: t => `<td>${t.date}</td>` },
+    amount:      { label: 'Monto',       fn: t => `<td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${fmtH(t.amount)}</td>` },
+    description: { label: 'Descripción', fn: t => `<td>${t.description}</td>` },
+    type:        { label: 'Tipo',        fn: t => `<td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>` },
+    category:    { label: 'Categoría',   fn: t => `<td>${renderCatDot(t.category)}<span class="home-cat-badge">${homeCatLabel(t.category)}</span></td>` },
+    notes:       { label: 'Notas',       fn: t => `<td>${renderNote(t.notes)}</td>` },
+  },
+  custom: {
+    date:        { label: 'Fecha',       fn: (t,curr) => `<td>${t.date}</td>` },
+    amount:      { label: 'Monto',       fn: (t,curr) => `<td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${curr}${t.amount.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>` },
+    description: { label: 'Descripción', fn: (t,curr) => `<td>${t.description}</td>` },
+    type:        { label: 'Tipo',        fn: (t,curr) => `<td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>` },
+    notes:       { label: 'Notas',       fn: (t,curr) => `<td>${renderNote(t.notes)}</td>` },
+  },
+};
+
+const COL_DEFAULTS = {
+  history: ['date','amount','description','type','category','notes'],
+  deudas:  ['date','persona','description','type','total','progress','status'],
+  home:    ['date','amount','description','type','category','notes'],
+  custom:  ['date','amount','description','type','notes'],
+};
+
+function getColConfig(tableId) {
+  try {
+    const stored = JSON.parse(localStorage.getItem('cashmap_col_config') || '{}');
+    const cfg = stored[tableId] || {};
+    return {
+      order:  cfg.order  && cfg.order.length  ? cfg.order  : [...COL_DEFAULTS[tableId]],
+      hidden: cfg.hidden || [],
+    };
+  } catch(e) { return { order: [...COL_DEFAULTS[tableId]], hidden: [] }; }
+}
+
+function saveColConfig(tableId, order, hidden) {
+  const stored = JSON.parse(localStorage.getItem('cashmap_col_config') || '{}');
+  stored[tableId] = { order, hidden };
+  localStorage.setItem('cashmap_col_config', JSON.stringify(stored));
+}
+
 const DEFAULT_CAT_COLORS = ['#3b82f6','#ef4444','#f59e0b','#22c55e','#8b5cf6','#06b6d4','#ec4899','#f97316'];
 let catColors = {};      // {categoryKey: '#hexcolor'} — Zelle + custom menus
 let homeCatColors = {};  // {categoryKey: '#hexcolor'} — Home Billings
@@ -2236,20 +2322,21 @@ function renderHistory() {
   if (mm) list = list.filter(t=>txMonth(t)===mm);
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
+  const { order: hOrd, hidden: hHid } = getColConfig('history');
+  const hDefs = COL_DEFS.history;
+  const hVis  = hOrd.filter(c => !hHid.includes(c) && hDefs[c]);
+  const hSpan = hVis.length + 1;
+  document.getElementById('hist-thead').innerHTML =
+    `<tr>${hVis.map(c=>`<th>${hDefs[c].label}</th>`).join('')}<th>Acciones</th></tr>`;
   document.getElementById('hist-count').textContent = list.length + ' transacciones';
   document.getElementById('hist-tbody').innerHTML = list.length ? renderRowsWithDateSep(list, t=>`
     <tr>
-      <td>${t.date}</td>
-      <td class="amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}${t.recurring?'<span class="rec-badge">🔄</span>':''}</td>
-      <td>${t.description}</td>
-      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
-      <td>${renderCatDot(t.category)}${catLabel(t.category)}${renderBudgetBar(t.category, t.date)}</td>
-      <td>${renderNote(t.notes)}</td>
+      ${hVis.map(c => hDefs[c].fn(t)).join('')}
       <td style="display:flex;gap:3px">
         <button class="btn-icon" onclick="openTxModal(${t.id})" title="Editar">✏️</button>
         <button class="btn-icon" onclick="dupeTx(${t.id})" title="Duplicar">📋</button>
       </td>
-    </tr>`, 7) : '<tr><td colspan="7" class="empty">No hay transacciones con estos filtros</td></tr>';
+    </tr>`, hSpan) : `<tr><td colspan="${hSpan}" class="empty">No hay transacciones con estos filtros</td></tr>`;
 }
 
 // ============================================================
@@ -2622,20 +2709,21 @@ function renderHome() {
   if (mm)  list = list.filter(t=>t.date.substring(5,7)===mm);
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
+  const { order: hmOrd, hidden: hmHid } = getColConfig('home');
+  const hmDefs = COL_DEFS.home;
+  const hmVis  = hmOrd.filter(c => !hmHid.includes(c) && hmDefs[c]);
+  const hmSpan = hmVis.length + 1;
+  document.getElementById('home-thead').innerHTML =
+    `<tr>${hmVis.map(c=>`<th>${hmDefs[c].label}</th>`).join('')}<th>Acciones</th></tr>`;
   document.getElementById('home-count').textContent = list.length + ' registro(s)';
   document.getElementById('home-tbody').innerHTML = list.length ? renderRowsWithDateSep(list, t=>`
     <tr>
-      <td>${t.date}</td>
-      <td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${fmtH(t.amount)}</td>
-      <td>${t.description}</td>
-      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
-      <td>${renderCatDot(t.category)}<span class="home-cat-badge">${homeCatLabel(t.category)}</span></td>
-      <td>${renderNote(t.notes)}</td>
+      ${hmVis.map(c => hmDefs[c].fn(t)).join('')}
       <td style="display:flex;gap:3px">
         <button class="btn-icon" onclick="openHomeTxModal(${t.id})" title="Editar">✏️</button>
         <button class="btn-icon" onclick="dupeHomeTx(${t.id})" title="Duplicar">📋</button>
       </td>
-    </tr>`, 7) : '<tr><td colspan="7" class="empty">No hay registros del hogar</td></tr>';
+    </tr>`, hmSpan) : `<tr><td colspan="${hmSpan}" class="empty">No hay registros del hogar</td></tr>`;
 }
 
 // ============================================================
@@ -2756,30 +2844,17 @@ function renderDeudas() {
   if (st) list = list.filter(d=>d.status===st);
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
+  const { order: ddOrd, hidden: ddHid } = getColConfig('deudas');
+  const ddDefs = COL_DEFS.deudas;
+  const ddVis  = ddOrd.filter(c => !ddHid.includes(c) && ddDefs[c]);
+  const ddSpan = ddVis.length + 1;
+  document.getElementById('deudas-thead').innerHTML =
+    `<tr>${ddVis.map(c=>`<th>${ddDefs[c].label}</th>`).join('')}<th>Acciones</th></tr>`;
   document.getElementById('deudas-count').textContent = list.length + ' registro(s)';
-  document.getElementById('deudas-tbody').innerHTML = list.length ? list.map(d=>{
-    const remaining = deudaRemaining(d);
-    const paid = d.paid || 0;
-    const pct = d.amount>0 ? Math.min(100,(paid/d.amount*100)) : 0;
-    const barCol = d.type==='por_cobrar'?'var(--green)':'var(--acc)';
+  document.getElementById('deudas-tbody').innerHTML = list.length ? list.map(d => {
     const hasPayments = d.payments && d.payments.length > 0;
-    const dc = d.currency || '$';
-    return `
-    <tr>
-      <td>${d.date}</td>
-      <td style="font-weight:600">${d.persona}</td>
-      <td class="deuda-col-desc" style="font-size:.8rem;color:var(--text2)">${d.description||'—'}</td>
-      <td><span class="badge ${d.type}">${d.type==='por_cobrar'?'Por cobrar':'Por pagar'}</span></td>
-      <td class="amount ${d.type}" style="font-weight:700">${fmtD(d.amount,dc)}</td>
-      <td>
-        <div class="debt-prog-wrap">
-          <div class="debt-prog-text">${fmtD(paid,dc)} <span style="color:var(--text2)">/ ${fmtD(d.amount,dc)}</span></div>
-          <div class="debt-prog-bar"><div class="debt-prog-fill" style="width:${pct.toFixed(1)}%;background:${barCol}"></div></div>
-          <div class="debt-prog-pct">${pct.toFixed(0)}%</div>
-          ${remaining > 0 ? `<div class="debt-prog-rest">Restante: ${fmtD(remaining,dc)}</div>` : ''}
-        </div>
-      </td>
-      <td><span class="badge ${d.status}">${deudaStatusLabel(d)}</span></td>
+    return `<tr>
+      ${ddVis.map(c => ddDefs[c].fn(d)).join('')}
       <td style="display:flex;gap:3px;flex-wrap:nowrap">
         ${hasPayments?`<button class="btn-icon" onclick="toggleDeudaHist(${d.id},this)" title="Ver pagos">▶</button>`:''}
         <button class="btn-icon" onclick="openDeudaModal(${d.id})" title="Editar deuda">✏️</button>
@@ -2787,7 +2862,7 @@ function renderDeudas() {
         <button class="btn-icon" onclick="toggleDeudaStatus(${d.id})" title="${d.status==='pagado'?'Reabrir':'Marcar pagado'}">${d.status==='pagado'?'↩️':'✅'}</button>
       </td>
     </tr>`;
-  }).join('') : '<tr><td colspan="8" class="empty">No hay deudas registradas</td></tr>';
+  }).join('') : `<tr><td colspan="${ddSpan}" class="empty">No hay deudas registradas</td></tr>`;
 }
 
 // ============================================================
@@ -3096,6 +3171,9 @@ document.getElementById('pago-modal').addEventListener('click', function(e) {
 });
 document.getElementById('deuda-modal').addEventListener('click', function(e) {
   if (e.target === this) closeDeudaModal();
+});
+document.getElementById('col-config-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeColConfigModal();
 });
 
 // ============================================================
@@ -3442,11 +3520,12 @@ function buildCustomMenuViews() {
       <div class="tbl-wrap">
         <div class="tbl-header">
           <h3>${m.icon} ${m.name} <span style="font-size:.72rem;color:var(--text2)">${m.currency}</span></h3>
-          <span id="cm-count-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="cm-count-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
+            <button class="btn btn-ghost" onclick="openColConfig('custom')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
+          </div>
         </div>
-        <div class="tbl-scroll"><table><thead><tr>
-          <th>Fecha</th><th>Monto</th><th>Descripción</th><th>Tipo</th><th>Notas</th><th>Acciones</th>
-        </tr></thead><tbody id="cm-tbody-${m.id}"></tbody></table></div>
+        <div class="tbl-scroll"><table><thead id="cm-thead-${m.id}"></thead><tbody id="cm-tbody-${m.id}"></tbody></table></div>
       </div>`;
     slot.appendChild(div);
 
@@ -3584,17 +3663,20 @@ function renderCustomMenuView(menuId) {
   if (mm) list=list.filter(t=>t.date.substring(5,7)===mm);
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
+  const { order: cmOrd, hidden: cmHid } = getColConfig('custom');
+  const cmDefs = COL_DEFS.custom;
+  const cmVis  = cmOrd.filter(c => !cmHid.includes(c) && cmDefs[c]);
+  const cmSpan = cmVis.length + 1;
+  const cmCurr = m.currency + ' ';
+  document.getElementById('cm-thead-'+menuId).innerHTML =
+    `<tr>${cmVis.map(c=>`<th>${cmDefs[c].label}</th>`).join('')}<th>Acciones</th></tr>`;
   document.getElementById('cm-count-'+menuId).textContent = list.length + ' registro(s)';
   const ro = isReadOnly();
   document.getElementById('cm-tbody-'+menuId).innerHTML = list.length ? renderRowsWithDateSep(list, t=>`
     <tr>
-      <td>${t.date}</td>
-      <td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${curr}${t.amount.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-      <td>${t.description}</td>
-      <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
-      <td>${renderNote(t.notes)}</td>
+      ${cmVis.map(c => cmDefs[c].fn(t, cmCurr)).join('')}
       <td style="display:flex;gap:3px">${ro?'':` <button class="btn-icon" onclick="openCustomTxModal(${menuId},${t.id})" title="Editar">✏️</button><button class="btn-icon" onclick="dupeCustomTx(${menuId},${t.id})" title="Duplicar">📋</button>`}</td>
-    </tr>`, 6) : '<tr><td colspan="6" class="empty">Sin registros</td></tr>';
+    </tr>`, cmSpan) : `<tr><td colspan="${cmSpan}" class="empty">Sin registros</td></tr>`;
 
 }
 
@@ -3677,6 +3759,73 @@ function deleteCustomTx(menuId, txId) {
     renderCustomMenuView(menuId);
     scheduleSave();
   }, {icon:'🗑️', okLabel:'Eliminar'});
+}
+
+// ============================================================
+// COLUMN CONFIG MODAL
+// ============================================================
+let _colConfigTable = null;
+let _colConfigTemp  = null;
+
+function openColConfig(tableId) {
+  _colConfigTable = tableId;
+  const cfg = getColConfig(tableId);
+  _colConfigTemp  = { order: [...cfg.order], hidden: [...cfg.hidden] };
+  const titles = { history:'Historial', deudas:'Deudas', home:'Home Billings', custom:'Menú personalizado' };
+  document.getElementById('col-config-title').textContent = 'Columnas — ' + (titles[tableId] || tableId);
+  renderColConfigList();
+  document.getElementById('col-config-modal').classList.add('open');
+}
+
+function closeColConfigModal() {
+  document.getElementById('col-config-modal').classList.remove('open');
+  _colConfigTable = null;
+  _colConfigTemp  = null;
+}
+
+function renderColConfigList() {
+  const defs  = COL_DEFS[_colConfigTable];
+  const order  = _colConfigTemp.order;
+  const hidden = _colConfigTemp.hidden;
+  document.getElementById('col-config-list').innerHTML = order.map((colId, i) => {
+    const def = defs[colId];
+    if (!def) return '';
+    const vis = !hidden.includes(colId);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
+      <input type="checkbox" ${vis?'checked':''} onchange="_colToggle('${colId}',this.checked)" style="accent-color:var(--acc);width:15px;height:15px;flex-shrink:0">
+      <span style="flex:1;font-size:.86rem">${def.label}</span>
+      <button onclick="_colMove(${i},-1)" ${i===0?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;color:var(--text2);font-size:.85rem">▲</button>
+      <button onclick="_colMove(${i},1)"  ${i===order.length-1?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;color:var(--text2);font-size:.85rem">▼</button>
+    </div>`;
+  }).join('');
+}
+
+function _colToggle(colId, visible) {
+  if (visible) _colConfigTemp.hidden = _colConfigTemp.hidden.filter(c => c !== colId);
+  else if (!_colConfigTemp.hidden.includes(colId)) _colConfigTemp.hidden.push(colId);
+}
+
+function _colMove(idx, dir) {
+  const arr = _colConfigTemp.order;
+  const ni = idx + dir;
+  if (ni < 0 || ni >= arr.length) return;
+  [arr[idx], arr[ni]] = [arr[ni], arr[idx]];
+  renderColConfigList();
+}
+
+function saveColConfigFromModal() {
+  saveColConfig(_colConfigTable, _colConfigTemp.order, _colConfigTemp.hidden);
+  const tbl = _colConfigTable;
+  closeColConfigModal();
+  if (tbl === 'history') renderHistory();
+  else if (tbl === 'deudas') renderDeudas();
+  else if (tbl === 'home') renderHome();
+  else if (tbl === 'custom') customMenus.forEach(m => renderCustomMenuView(m.id));
+}
+
+function resetColConfig() {
+  _colConfigTemp = { order: [...COL_DEFAULTS[_colConfigTable]], hidden: [] };
+  renderColConfigList();
 }
 
 // ============================================================
