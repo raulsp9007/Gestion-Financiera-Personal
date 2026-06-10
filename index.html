@@ -961,8 +961,8 @@
         <input type="text" id="d-search" placeholder="🔍 Buscar persona o descripción..." oninput="renderDeudas();updateFilterCount('deudas-filter-count','d-search','d-type','d-status')">
         <select id="d-type" onchange="renderDeudas();updateFilterCount('deudas-filter-count','d-search','d-type','d-status')">
           <option value="">Todos</option>
-          <option value="por_cobrar">Por cobrar</option>
-          <option value="por_pagar">Por pagar</option>
+          <option value="por_cobrar">Préstamo dado</option>
+          <option value="por_pagar">Préstamo recibido</option>
         </select>
         <select id="d-status" onchange="renderDeudas();updateFilterCount('deudas-filter-count','d-search','d-type','d-status')">
           <option value="">Todos los estados</option>
@@ -1128,8 +1128,8 @@
       <div class="form-row">
         <label>Tipo</label>
         <select id="deuda-type">
-          <option value="por_cobrar">💚 Por cobrar (me deben)</option>
-          <option value="por_pagar">🔴 Por pagar (yo debo)</option>
+          <option value="por_cobrar">💚 Préstamo dado (me deben)</option>
+          <option value="por_pagar">🔴 Préstamo recibido (yo debo)</option>
         </select>
       </div>
       <div class="form-row">
@@ -1687,7 +1687,7 @@ const COL_DEFS = {
     date:        { label: 'Fecha',       fn: d => `<td>${d.date}</td>` },
     persona:     { label: 'Persona',     fn: d => `<td style="font-weight:600">${d.persona}</td>` },
     description: { label: 'Descripción', fn: d => `<td class="deuda-col-desc" style="font-size:.8rem;color:var(--text2)">${d.description||'—'}</td>` },
-    type:        { label: 'Tipo',        fn: d => `<td><span class="badge ${d.type}">${d.type==='por_cobrar'?'Por cobrar':'Por pagar'}</span></td>` },
+    type:        { label: 'Tipo',        fn: d => `<td><span class="badge ${d.type}">${d.type==='por_cobrar'?'Préstamo dado':'Préstamo recibido'}</span></td>` },
     total:       { label: 'Total',       fn: d => { const dc=d.currency||'$'; return `<td class="amount ${d.type}" style="font-weight:700">${fmtD(d.amount,dc)}</td>`; } },
     progress:    { label: 'Progreso',    fn: d => { const dc=d.currency||'$'; const paid=d.paid||0; const pct=d.amount>0?Math.min(100,paid/d.amount*100):0; const barCol=d.type==='por_cobrar'?'var(--green)':'var(--acc)'; const rem=deudaRemaining(d); return `<td><div class="debt-prog-wrap"><div class="debt-prog-text">${fmtD(paid,dc)} <span style="color:var(--text2)">/ ${fmtD(d.amount,dc)}</span></div><div class="debt-prog-bar"><div class="debt-prog-fill" style="width:${pct.toFixed(1)}%;background:${barCol}"></div></div><div class="debt-prog-pct">${pct.toFixed(0)}%</div>${rem>0?`<div class="debt-prog-rest">Restante: ${fmtD(rem,dc)}</div>`:''}</div></td>`; } },
     status:      { label: 'Estado',      fn: d => `<td><span class="badge ${d.status}">${deudaStatusLabel(d)}</span></td>` },
@@ -2997,7 +2997,7 @@ function openPagoModal(deudaId) {
 
   const paid = d.paid || 0;
   const remaining = Math.round(deudaRemaining(d) * 100) / 100;
-  const typeLabel = d.type === 'por_cobrar' ? 'Por cobrar' : 'Por pagar';
+  const typeLabel = d.type === 'por_cobrar' ? 'Préstamo dado' : 'Préstamo recibido';
   const saldada = remaining <= 0;
 
   document.getElementById('pago-modal-title').textContent = '💸 Deuda – ' + d.persona;
