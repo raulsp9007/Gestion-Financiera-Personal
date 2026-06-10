@@ -982,6 +982,14 @@
         <div class="tbl-scroll"><table><thead id="deudas-thead"></thead>
         <tbody id="deudas-tbody"></tbody></table></div>
       </div>
+      <div class="tbl-wrap" id="deudas-pagadas-section" style="margin-top:20px;display:none">
+        <div class="tbl-header">
+          <h3 style="color:var(--text2)">✅ Deudas anteriores</h3>
+          <span id="deudas-pagadas-count" style="font-size:.78rem;color:var(--text2)"></span>
+        </div>
+        <div class="tbl-scroll"><table><thead id="deudas-pagadas-thead"></thead>
+        <tbody id="deudas-pagadas-tbody"></tbody></table></div>
+      </div>
     </div>
 
     <!-- ===== HOME BILLINGS ===== -->
@@ -2844,14 +2852,18 @@ function renderDeudas() {
   if (st) list = list.filter(d=>d.status===st);
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
+  const activeList = list.filter(d => d.status !== 'pagado');
+  const paidList   = list.filter(d => d.status === 'pagado');
+
   const { order: ddOrd, hidden: ddHid } = getColConfig('deudas');
   const ddDefs = COL_DEFS.deudas;
   const ddVis  = ddOrd.filter(c => !ddHid.includes(c) && ddDefs[c]);
   const ddSpan = ddVis.length + 1;
-  document.getElementById('deudas-thead').innerHTML =
-    `<tr>${ddVis.map(c=>`<th>${ddDefs[c].label}</th>`).join('')}<th>Acciones</th></tr>`;
-  document.getElementById('deudas-count').textContent = list.length + ' registro(s)';
-  document.getElementById('deudas-tbody').innerHTML = list.length ? list.map(d => {
+  const theadHtml = `<tr>${ddVis.map(c=>`<th>${ddDefs[c].label}</th>`).join('')}<th>Acciones</th></tr>`;
+  document.getElementById('deudas-thead').innerHTML = theadHtml;
+  document.getElementById('deudas-pagadas-thead').innerHTML = theadHtml;
+
+  const makeDeudaRow = d => {
     const hasPayments = d.payments && d.payments.length > 0;
     return `<tr>
       ${ddVis.map(c => ddDefs[c].fn(d)).join('')}
@@ -2862,7 +2874,21 @@ function renderDeudas() {
         <button class="btn-icon" onclick="toggleDeudaStatus(${d.id})" title="${d.status==='pagado'?'Reabrir':'Marcar pagado'}">${d.status==='pagado'?'↩️':'✅'}</button>
       </td>
     </tr>`;
-  }).join('') : `<tr><td colspan="${ddSpan}" class="empty">No hay deudas registradas</td></tr>`;
+  };
+
+  document.getElementById('deudas-count').textContent = activeList.length + ' registro(s)';
+  document.getElementById('deudas-tbody').innerHTML = activeList.length
+    ? activeList.map(makeDeudaRow).join('')
+    : `<tr><td colspan="${ddSpan}" class="empty">No hay deudas registradas</td></tr>`;
+
+  const pagSec = document.getElementById('deudas-pagadas-section');
+  if (paidList.length) {
+    pagSec.style.display = '';
+    document.getElementById('deudas-pagadas-count').textContent = paidList.length + ' registro(s)';
+    document.getElementById('deudas-pagadas-tbody').innerHTML = paidList.map(makeDeudaRow).join('');
+  } else {
+    pagSec.style.display = 'none';
+  }
 }
 
 // ============================================================
