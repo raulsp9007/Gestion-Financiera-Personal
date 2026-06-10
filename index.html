@@ -188,6 +188,9 @@
   .btn-sm{padding:5px 11px;font-size:.75rem}
   .btn-icon{background:transparent;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;color:var(--text2);transition:.15s}
   .btn-icon:hover{background:var(--bg3);color:var(--text)}
+  /* COLUMNAS BTN — solo admin */
+  .col-cfg-btn{display:none}
+  body.is-admin .col-cfg-btn{display:inline-flex}
   /* MODAL */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center}
   .modal-overlay.open{display:flex}
@@ -933,7 +936,7 @@
           <h3>Historial completo</h3>
           <div style="display:flex;align-items:center;gap:8px">
             <span id="hist-count" style="font-size:.78rem;color:var(--text2)"></span>
-            <button class="btn btn-ghost" onclick="openColConfig('history')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
+            <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('history')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
           </div>
         </div>
         <div class="tbl-scroll"><table><thead id="hist-thead"></thead>
@@ -976,7 +979,7 @@
           <h3>Registro de deudas</h3>
           <div style="display:flex;align-items:center;gap:8px">
             <span id="deudas-count" style="font-size:.78rem;color:var(--text2)"></span>
-            <button class="btn btn-ghost" onclick="openColConfig('deudas')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
+            <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('deudas')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
           </div>
         </div>
         <div class="tbl-scroll"><table><thead id="deudas-thead"></thead>
@@ -1032,7 +1035,7 @@
           <h3>🏠 Registro del hogar <span class="home-curr" id="home-curr-label"></span></h3>
           <div style="display:flex;align-items:center;gap:8px">
             <span id="home-count" style="font-size:.78rem;color:var(--text2)"></span>
-            <button class="btn btn-ghost" onclick="openColConfig('home')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
+            <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('home')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
           </div>
         </div>
         <div class="tbl-scroll"><table><thead id="home-thead"></thead>
@@ -1846,6 +1849,8 @@ function initFromDrive(data) {
     if (c.sessionSeed) sessionSeed = c.sessionSeed;
     else { sessionSeed = Date.now().toString(36); }
     if (c.budgets) budgets = c.budgets;
+    if (c.colConfig && Object.keys(c.colConfig).length)
+      localStorage.setItem('cashmap_col_config', JSON.stringify(c.colConfig));
   }
   if (!data) scheduleSave();
 
@@ -1853,7 +1858,7 @@ function initFromDrive(data) {
   try {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,sessionSeed:sessionSeed,budgets:budgets}
+      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,sessionSeed:sessionSeed,budgets:budgets,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}')}
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
@@ -1882,7 +1887,8 @@ function pushToDrive() {
     version: 1,
     lastUpdated: new Date().toISOString(),
     config: {
-      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, sessionSeed:sessionSeed, budgets:budgets
+      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, sessionSeed:sessionSeed, budgets:budgets,
+      colConfig: JSON.parse(localStorage.getItem('cashmap_col_config') || '{}')
     },
     transactions:txs, deudas:deudas, home:homeTxs
   };
@@ -3437,6 +3443,7 @@ function logout() {
 
 function applyRoleUI() {
   const isAdmin = !currentUser || currentUser.role === 'admin';
+  document.body.classList.toggle('is-admin', isAdmin);
   const ab = document.getElementById('admin-btn');
   if (ab) ab.style.display = isAdmin ? '' : 'none';
   const lb = document.getElementById('logout-btn');
@@ -3548,7 +3555,7 @@ function buildCustomMenuViews() {
           <h3>${m.icon} ${m.name} <span style="font-size:.72rem;color:var(--text2)">${m.currency}</span></h3>
           <div style="display:flex;align-items:center;gap:8px">
             <span id="cm-count-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
-            <button class="btn btn-ghost" onclick="openColConfig('custom')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
+            <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('custom')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
           </div>
         </div>
         <div class="tbl-scroll"><table><thead id="cm-thead-${m.id}"></thead><tbody id="cm-tbody-${m.id}"></tbody></table></div>
@@ -3847,6 +3854,8 @@ function saveColConfigFromModal() {
   else if (tbl === 'deudas') renderDeudas();
   else if (tbl === 'home') renderHome();
   else if (tbl === 'custom') customMenus.forEach(m => renderCustomMenuView(m.id));
+  // Admin: propagar a Drive → todos los usuarios ven el mismo config
+  if (currentUser && currentUser.role === 'admin') scheduleSave();
 }
 
 function resetColConfig() {
