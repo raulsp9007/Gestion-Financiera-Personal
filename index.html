@@ -1822,6 +1822,15 @@ const CACHE_TS_KEY = 'cashmap_data_ts';
 
 let deferredInstallPrompt = null;
 let pendingOfflineChanges = false;
+let _pollTimer = null;    // handle del intervalo de polling de sync
+// BroadcastChannel: sync instantáneo entre pestañas del mismo navegador
+const _bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('cashmap-sync') : null;
+if (_bc) {
+  _bc.onmessage = e => {
+    if (e.data && e.data.type === 'DATA_CHANGED' && e.data.updatedAt > lastUpdatedStr && !isModalOpen())
+      applyRemoteData(e.data.payload);
+  };
+}
 
 // ============================================================
 // DRIVE SYNC (google.script.run)
@@ -1930,6 +1939,8 @@ function initFromDrive(data) {
   initAuth();
   setSyncBadge('ok');
   renderAll();
+  // Arrancar polling de sync en background (detecta cambios de otros dispositivos)
+  startSyncPoller();
 }
 
 function scheduleSave() {
@@ -1972,8 +1983,11 @@ function pushToDrive() {
   if (inAppsScript) {
     google.script.run
       .withSuccessHandler(r => {
-        if (r && r.ok) setSyncBadge('ok', '✅ Guardado en Drive (' + r.count + ')');
-        else setSyncBadge('error');
+        if (r && r.ok) {
+          setSyncBadge('ok', '✅ Guardado en Drive (' + r.count + ')');
+          lastUpdatedStr = payload.lastUpdated;
+          if (_bc) _bc.postMessage({type:'DATA_CHANGED', updatedAt:payload.lastUpdated, payload});
+        } else setSyncBadge('error');
       })
       .withFailureHandler(() => { pendingOfflineChanges = true; setSyncBadge('error'); })
       .saveData(payload);
@@ -1997,8 +2011,11 @@ function pushToDrive() {
         setSyncBadge('error');
         return;
       }
-      if (r && r.ok) setSyncBadge('ok', '✅ Guardado');
-      else { console.error('[CashMap] Error del servidor:', r); setSyncBadge('error'); }
+      if (r && r.ok) {
+        setSyncBadge('ok', '✅ Guardado');
+        lastUpdatedStr = payload.lastUpdated;
+        if (_bc) _bc.postMessage({type:'DATA_CHANGED', updatedAt:payload.lastUpdated, payload});
+      } else { console.error('[CashMap] Error del servidor:', r); setSyncBadge('error'); }
     })
     .catch(err => { console.error('[CashMap] Error de red al guardar:', err); pendingOfflineChanges = true; setSyncBadge('error'); });
     return;
@@ -2011,6 +2028,61 @@ function pushToDrive() {
 function forceSave() {
   clearTimeout(saveTimeout);
   pushToDrive();
+}
+
+function isModalOpen() {
+  return !!document.querySelector('.modal.open');
+}
+
+// Aplica datos recibidos de otro dispositivo/pestaña sin reiniciar auth
+function applyRemoteData(data) {
+  if (!data || data.error) return;
+  if (Array.isArray(data.transactions)) txs = data.transactions;
+  if (Array.isArray(data.deudas)) deudas = data.deudas;
+  if (Array.isArray(data.home)) homeTxs = data.home;
+  if (data.config) {
+    const c = data.config;
+    if (c.globalCats) { globalCats = c.globalCats; rebuildLegacyCatMaps(); }
+    if (c.homeCurr) HOME_CURR = c.homeCurr;
+    if (c.navOrder && Array.isArray(c.navOrder)) navOrder = c.navOrder;
+    if (c.customMenus) { customMenus = c.customMenus; buildCustomMenuViews(); renderNavForUser(); }
+    if (c.budgets) budgets = c.budgets;
+    if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
+  }
+  if (data.lastUpdated) lastUpdatedStr = data.lastUpdated;
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
+  } catch(e) {}
+  renderAll();
+  showToast('🔄 Datos actualizados', 'var(--green)', 2500);
+}
+
+// Polling cada 20s para detectar cambios de otros dispositivos
+function startSyncPoller() {
+  if (_pollTimer) return;
+  const hasBackend = inAppsScript || !!getApiUrl();
+  if (!hasBackend) return;
+  _pollTimer = setInterval(() => {
+    if (!navigator.onLine || isModalOpen()) return;
+    if (inAppsScript) {
+      google.script.run
+        .withSuccessHandler(data => {
+          if (data && !data.error && data.lastUpdated > lastUpdatedStr) applyRemoteData(data);
+        })
+        .withFailureHandler(() => {})
+        .loadData();
+    } else {
+      const url = getApiUrl();
+      if (!url) return;
+      fetch(url + '?action=load')
+        .then(r => r.json())
+        .then(data => {
+          if (data && !data.error && data.lastUpdated > lastUpdatedStr) applyRemoteData(data);
+        })
+        .catch(() => {});
+    }
+  }, 20000);
 }
 
 // ============================================================
