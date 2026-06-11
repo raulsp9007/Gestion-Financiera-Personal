@@ -1828,7 +1828,8 @@ const CACHE_TS_KEY = 'cashmap_data_ts';
 
 let deferredInstallPrompt = null;
 let pendingOfflineChanges = false;
-let _pollTimer = null;    // handle del intervalo de polling de sync
+let _pollTimer = null;         // handle del intervalo de polling de sync
+let _pendingLocalChanges = false; // true mientras debounce no ha disparado pushToDrive
 // BroadcastChannel: sync instantáneo entre pestañas del mismo navegador
 const _bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('cashmap-sync') : null;
 if (_bc) {
@@ -1950,6 +1951,7 @@ function initFromDrive(data) {
 }
 
 function scheduleSave() {
+  _pendingLocalChanges = true;
   setSyncBadge('pending');
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(pushToDrive, SAVE_DELAY);
@@ -1993,6 +1995,7 @@ function pushToDrive() {
           setSyncBadge('ok', '✅ Guardado en Drive (' + r.count + ')');
           lastUpdatedStr = payload.lastUpdated;
           _lastOwnSaveTs = Date.now();
+          _pendingLocalChanges = false;
           if (_bc) _bc.postMessage({type:'DATA_CHANGED', updatedAt:payload.lastUpdated, payload});
         } else setSyncBadge('error');
       })
@@ -2022,6 +2025,7 @@ function pushToDrive() {
         setSyncBadge('ok', '✅ Guardado');
         lastUpdatedStr = payload.lastUpdated;
         _lastOwnSaveTs = Date.now();
+        _pendingLocalChanges = false;
         if (_bc) _bc.postMessage({type:'DATA_CHANGED', updatedAt:payload.lastUpdated, payload});
       } else { console.error('[CashMap] Error del servidor:', r); setSyncBadge('error'); }
     })
@@ -2039,12 +2043,13 @@ function forceSave() {
 }
 
 function isModalOpen() {
-  return !!document.querySelector('.modal.open');
+  return !!document.querySelector('.modal-overlay.open');
 }
 
 // Aplica datos recibidos de otro dispositivo/pestaña sin reiniciar auth
 function applyRemoteData(data) {
   if (!data || data.error) return;
+  if (_pendingLocalChanges) return; // cambios locales sin guardar — ignorar remote
   if (Array.isArray(data.transactions)) txs = data.transactions;
   if (Array.isArray(data.deudas)) deudas = data.deudas;
   if (Array.isArray(data.home)) homeTxs = data.home;
