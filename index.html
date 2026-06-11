@@ -2275,7 +2275,7 @@ function getHomeCatColor(key, idx) { return getCatColor(key, idx); }
 function _setCatColor(key, val) {
   const cat = globalCats.inc[key] || globalCats.exp[key];
   if (cat) cat.color = val;
-  else catColors[key] = val;
+  else { globalCats.exp[key] = { label: key, color: val }; rebuildLegacyCatMaps(); }
   refreshAllCatCharts();
   try { renderHome(); } catch(e) {}
 }
@@ -3041,10 +3041,12 @@ function saveHomeTx() {
     homeTxs.push(tx);
   }
 
-  // Guardar color de categoría si es gasto
-  if (type === 'expense') {
-    const colorInp = document.getElementById('home-cat-color');
-    if (colorInp) homeCatColors[cat] = colorInp.value;
+  // Guardar color de categoría en globalCats
+  const _hColorInp = document.getElementById('home-cat-color');
+  if (_hColorInp) {
+    const gc = globalCats.inc[cat] || globalCats.exp[cat];
+    if (gc) gc.color = _hColorInp.value;
+    else globalCats.exp[cat] = { label: cat, color: _hColorInp.value };
   }
 
   closeHomeTxModal();
@@ -4079,6 +4081,14 @@ function saveCustomTx(menuId) {
     if (recurring) tx.recurringNext = recurringNext;
     m.data.push(tx);
   }
+  // Guardar color de categoría en globalCats
+  const _cmColorInp = document.getElementById('home-cat-color');
+  if (_cmColorInp) {
+    const gc = globalCats.inc[cat] || globalCats.exp[cat];
+    if (gc) gc.color = _cmColorInp.value;
+    else globalCats.exp[cat] = { label: cat, color: _cmColorInp.value };
+  }
+
   activeCustomMenuId = null;
   closeHomeTxModal();
   renderCustomMenuView(menuId);
@@ -5048,8 +5058,7 @@ function renderRowsWithDateSep(list, rowFn, colspan) {
 // MEJORA D — CATEGORY COLORED DOT
 // ============================================================
 function renderCatDot(catKey) {
-  const cat = globalCats.inc[catKey] || globalCats.exp[catKey];
-  const color = cat ? cat.color : '#64748b';
+  const color = getCatColor(catKey, 0);
   return `<span class="cat-dot" style="background:${color}"></span>`;
 }
 
