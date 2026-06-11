@@ -1986,6 +1986,7 @@ function pushToDrive() {
         if (r && r.ok) {
           setSyncBadge('ok', '✅ Guardado en Drive (' + r.count + ')');
           lastUpdatedStr = payload.lastUpdated;
+          _lastOwnSaveTs = Date.now();
           if (_bc) _bc.postMessage({type:'DATA_CHANGED', updatedAt:payload.lastUpdated, payload});
         } else setSyncBadge('error');
       })
@@ -2014,6 +2015,7 @@ function pushToDrive() {
       if (r && r.ok) {
         setSyncBadge('ok', '✅ Guardado');
         lastUpdatedStr = payload.lastUpdated;
+        _lastOwnSaveTs = Date.now();
         if (_bc) _bc.postMessage({type:'DATA_CHANGED', updatedAt:payload.lastUpdated, payload});
       } else { console.error('[CashMap] Error del servidor:', r); setSyncBadge('error'); }
     })
@@ -2058,13 +2060,16 @@ function applyRemoteData(data) {
   showToast('🔄 Datos actualizados', 'var(--green)', 2500);
 }
 
-// Polling cada 20s para detectar cambios de otros dispositivos
+// Polling adaptativo: 3s visible, 60s background
+let _lastOwnSaveTs = 0;  // evita re-importar nuestros propios cambios
 function startSyncPoller() {
   if (_pollTimer) return;
   const hasBackend = inAppsScript || !!getApiUrl();
   if (!hasBackend) return;
-  _pollTimer = setInterval(() => {
+
+  function poll() {
     if (!navigator.onLine || isModalOpen()) return;
+    if (Date.now() - _lastOwnSaveTs < 5000) return; // skip 5s tras guardado propio
     if (inAppsScript) {
       google.script.run
         .withSuccessHandler(data => {
@@ -2078,12 +2083,29 @@ function startSyncPoller() {
       fetch(url + '?action=load')
         .then(r => r.json())
         .then(data => {
-          console.log('[Sync] poll →', data?.lastUpdated, '| local:', lastUpdatedStr, '| newer:', data?.lastUpdated > lastUpdatedStr);
           if (data && !data.error && data.lastUpdated > lastUpdatedStr) applyRemoteData(data);
         })
-        .catch(err => console.warn('[Sync] poll error:', err));
+        .catch(() => {});
     }
-  }, 20000);
+  }
+
+  // Intervalo activo según visibilidad
+  function scheduleNext() {
+    const delay = document.visibilityState === 'visible' ? 3000 : 60000;
+    _pollTimer = setTimeout(() => { poll(); scheduleNext(); }, delay);
+  }
+
+  // Reiniciar intervalo inmediato al volver a la pestaña
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      clearTimeout(_pollTimer);
+      _pollTimer = null;
+      poll();
+      scheduleNext();
+    }
+  });
+
+  scheduleNext();
 }
 
 // ============================================================
