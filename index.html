@@ -1043,26 +1043,30 @@
       <div class="month-tabs" id="home-month-tabs" style="margin-bottom:14px"></div>
 
       <div class="cards" id="home-cards"></div>
+      <div class="weekly-wrap">
+        <h4>Gastos por semana</h4>
+        <canvas id="chart-home-weekly" style="max-height:160px"></canvas>
+      </div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos (hogar)</h3><canvas id="chart-home-monthly"></canvas></div>
         <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal('home')" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="chart-home-cat"></canvas></div>
       </div>
-      <button class="filter-toggle-btn" onclick="toggleFilters('home-filters','hf-search','hf-type','hf-cat','hf-month')">
+      <button class="filter-toggle-btn" onclick="toggleFilters('home-filters','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
         🔍 Buscar y filtrar
         <span class="ft-count" id="home-filter-count"></span>
         <span style="margin-left:auto;font-size:.8rem" id="home-filter-arrow">▾</span>
       </button>
       <div class="filters" id="home-filters">
-        <input type="text" id="hf-search" placeholder="🔍 Buscar descripción o notas..." oninput="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month')">
-        <select id="hf-type" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month')">
+        <input type="text" id="hf-search" placeholder="🔍 Buscar descripción o notas..." oninput="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
+        <select id="hf-type" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
           <option value="">Todos los tipos</option>
           <option value="income">💚 Ingresos</option>
           <option value="expense">🔴 Gastos</option>
         </select>
-        <select id="hf-cat" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month')">
+        <select id="hf-cat" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
           <option value="">Todas las categorías</option>
         </select>
-        <select id="hf-month" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month')">
+        <select id="hf-month" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
           <option value="">Todos los meses</option>
           <option value="01">Enero</option><option value="02">Febrero</option>
           <option value="03">Marzo</option><option value="04">Abril</option>
@@ -1071,12 +1075,15 @@
           <option value="09">Septiembre</option><option value="10">Octubre</option>
           <option value="11">Noviembre</option><option value="12">Diciembre</option>
         </select>
+        <input type="date" id="hf-date-from" title="Fecha desde" oninput="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')" style="font-size:.82rem">
+        <input type="date" id="hf-date-to"   title="Fecha hasta" oninput="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')" style="font-size:.82rem">
       </div>
       <div class="tbl-wrap">
         <div class="tbl-header">
           <h3>🏠 Registro del hogar <span class="home-curr" id="home-curr-label"></span></h3>
           <div style="display:flex;align-items:center;gap:8px">
             <span id="home-count" style="font-size:.78rem;color:var(--text2)"></span>
+            <button class="btn btn-ghost" onclick="exportHomeCSV()" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
             <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('home')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
           </div>
         </div>
@@ -1875,7 +1882,7 @@ let editingHomeId = null;
 let currentView = 'view-dashboard';
 let currentMonth = '06';
 let chartMonthly = null, chartCat = null, chartBalance = null;
-let chartHomeMonthly = null, chartHomeCat = null;
+let chartHomeMonthly = null, chartHomeCat = null, chartHomeWeekly = null;
 const _cmDashCharts = {}; // instancias Chart por menú: {inc_ID, exp_ID}
 let editingId = null;
 let saveTimeout = null;
@@ -2585,7 +2592,7 @@ function renderMonthly() {
     <div class="card ${net>=0?'blue':'red'}"><div class="label">Neto</div><div class="value">${fmtSigned(net)}</div></div>
     <div class="card ${projNet>=0?'':'red'}"><div class="label">Proyección al ${daysInMonth}</div><div class="value" style="font-size:1.2rem;color:var(--text2)">${fmtSigned(projNet)}</div><div class="proj-lbl">gasto est. ${fmt(projExp)}</div></div>
   `;
-  renderWeeklyChart(list);
+  _weeklyChart = renderWeeklyChart(list, 'chart-weekly', _weeklyChart);
 
   document.getElementById('month-tbl-title').textContent = monthName(currentMonth) + ' 2026 – ' + list.length + ' transacciones';
   document.getElementById('month-tbody').innerHTML = list.length ? list.map(t=>`
@@ -2991,11 +2998,24 @@ function renderHome() {
     prevInc = prevList.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
     prevExp = prevList.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   }
+  // Proyección fin de mes (solo mes actual)
+  const _hToday = new Date();
+  const _hThisMM = String(_hToday.getMonth()+1).padStart(2,'0');
+  let _hFourthCard;
+  if (curMM && curMM === _hThisMM) {
+    const daysInMonth = new Date(_hToday.getFullYear(), parseInt(curMM), 0).getDate();
+    const dayOfMonth  = _hToday.getDate();
+    const projExp = dayOfMonth > 0 ? Math.round((exp / dayOfMonth) * daysInMonth * 100) / 100 : exp;
+    const projNet = inc - projExp;
+    _hFourthCard = `<div class="card ${projNet>=0?'':'red'}"><div class="label">Proyección al ${daysInMonth}</div><div class="value" style="font-size:1.2rem;color:var(--text2)">${projNet>=0?'+':''}${fmtH(Math.abs(projNet))}</div><div class="proj-lbl">gasto est. ${fmtH(projExp)}</div></div>`;
+  } else {
+    _hFourthCard = `<div class="card purple"><div class="label">Registros</div><div class="value" style="font-size:1.6rem">${baseList.length}</div><div class="sub">de ${homeTxs.length} total</div></div>`;
+  }
   document.getElementById('home-cards').innerHTML = `
     <div class="card green"><div class="label">Ingresos</div><div class="value">${fmtH(inc)}</div>${curMM?renderPctBadge(inc,prevInc):'<div class="sub">'+periodLabel+'</div>'}</div>
     <div class="card red"><div class="label">Gastos</div><div class="value">${fmtH(exp)}</div>${curMM?renderPctBadge(exp,prevExp,true):'<div class="sub">'+periodLabel+'</div>'}</div>
     <div class="card ${net>=0?'blue':'red'}"><div class="label">Balance</div><div class="value" style="font-size:1.4rem">${net>=0?'+':''}${fmtH(net)}</div><div class="sub">${periodLabel}</div></div>
-    <div class="card purple"><div class="label">Registros</div><div class="value" style="font-size:1.6rem">${baseList.length}</div><div class="sub">de ${homeTxs.length} total</div></div>
+    ${_hFourthCard}
   `;
 
   // Charts — siempre sobre todos los meses para ver tendencia completa
@@ -3027,16 +3047,22 @@ function renderHome() {
     options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}}}}
   });
 
+  chartHomeWeekly = renderWeeklyChart(baseList, 'chart-home-weekly', chartHomeWeekly);
+
   // Tabla con filtros
   let list = [...homeTxs];
   const s   = (document.getElementById('hf-search').value||'').toLowerCase();
   const tp  = document.getElementById('hf-type').value;
   const cat = document.getElementById('hf-cat').value;
   const mm  = document.getElementById('hf-month').value;
+  const df  = document.getElementById('hf-date-from')?.value || '';
+  const dt  = document.getElementById('hf-date-to')?.value || '';
   if (s)   list = list.filter(t=>t.description.toLowerCase().includes(s)||(t.notes||'').toLowerCase().includes(s));
   if (tp)  list = list.filter(t=>t.type===tp);
   if (cat) list = list.filter(t=>t.category===cat);
   if (mm)  list = list.filter(t=>t.date.substring(5,7)===mm);
+  if (df)  list = list.filter(t=>t.date>=df);
+  if (dt)  list = list.filter(t=>t.date<=dt);
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
   const { order: hmOrd, hidden: hmHid } = getColConfig('home');
@@ -3933,27 +3959,33 @@ function buildCustomMenuViews() {
     div.innerHTML = `
       <div class="month-tabs" id="cm-month-tabs-${m.id}" style="margin-bottom:14px"></div>
       <div class="cards" id="cm-cards-${m.id}"></div>
+      <div class="weekly-wrap">
+        <h4>Gastos por semana</h4>
+        <canvas id="cm-chart-weekly-${m.id}" style="max-height:160px"></canvas>
+      </div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos</h3><canvas id="cm-chart-monthly-${m.id}"></canvas></div>
         <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal('custom',${m.id})" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="cm-chart-cat-${m.id}"></canvas></div>
       </div>
-      <button class="filter-toggle-btn" onclick="toggleFilters('cmf-filters-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}')">
+      <button class="filter-toggle-btn" onclick="toggleFilters('cmf-filters-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
         🔍 Buscar y filtrar
         <span class="ft-count" id="cmf-filter-count-${m.id}"></span>
         <span style="margin-left:auto;font-size:.8rem" id="cmf-filter-arrow-${m.id}">▾</span>
       </button>
       <div class="filters" id="cmf-filters-${m.id}">
-        <input type="text" id="cmf-search-${m.id}" placeholder="🔍 Buscar..." oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}')">
-        <select id="cmf-type-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}')">
+        <input type="text" id="cmf-search-${m.id}" placeholder="🔍 Buscar..." oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
+        <select id="cmf-type-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
           <option value="">Todos</option><option value="income">Ingresos</option><option value="expense">Gastos</option>
         </select>
-        <select id="cmf-cat-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}')">
+        <select id="cmf-cat-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
           <option value="">Todas las categorías</option>
         </select>
-        <select id="cmf-month-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}')">
+        <select id="cmf-month-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
           <option value="">Todos los meses</option>
           ${['01','02','03','04','05','06','07','08','09','10','11','12'].map(mo=>`<option value="${mo}">${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(mo)-1]}</option>`).join('')}
         </select>
+        <input type="date" id="cmf-date-from-${m.id}" title="Fecha desde" oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')" style="font-size:.82rem">
+        <input type="date" id="cmf-date-to-${m.id}"   title="Fecha hasta" oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')" style="font-size:.82rem">
       </div>
       <!-- Registros -->
       <div class="tbl-wrap">
@@ -3961,6 +3993,7 @@ function buildCustomMenuViews() {
           <h3>${m.icon} ${m.name} <span style="font-size:.72rem;color:var(--text2)">${m.currency}</span></h3>
           <div style="display:flex;align-items:center;gap:8px">
             <span id="cm-count-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
+            <button class="btn btn-ghost" onclick="exportCustomCSV(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
             <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('custom')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
           </div>
         </div>
@@ -3969,7 +4002,7 @@ function buildCustomMenuViews() {
     slot.appendChild(div);
 
     // Init chart holders
-    if (!customCharts[m.id]) customCharts[m.id] = {monthly:null, cat:null};
+    if (!customCharts[m.id]) customCharts[m.id] = {monthly:null, cat:null, weekly:null};
   });
 }
 
@@ -4107,11 +4140,25 @@ function renderCustomMenuView(menuId) {
     prevExp = prevList.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   }
 
+  // Proyección fin de mes (solo mes actual)
+  const _cmToday = new Date();
+  const _cmThisMM = String(_cmToday.getMonth()+1).padStart(2,'0');
+  let _cmFourthCard;
+  if (curMM && curMM === _cmThisMM) {
+    const daysInMonth = new Date(_cmToday.getFullYear(), parseInt(curMM), 0).getDate();
+    const dayOfMonth  = _cmToday.getDate();
+    const projExp = dayOfMonth > 0 ? Math.round((exp / dayOfMonth) * daysInMonth * 100) / 100 : exp;
+    const projNet = inc - projExp;
+    _cmFourthCard = `<div class="card ${projNet>=0?'':'red'}"><div class="label">Proyección al ${daysInMonth}</div><div class="value" style="font-size:1.2rem;color:var(--text2)">${projNet>=0?'+':''}${fmt(Math.abs(projNet))}</div><div class="proj-lbl">gasto est. ${fmt(projExp)}</div></div>`;
+  } else {
+    _cmFourthCard = `<div class="card purple"><div class="label">Registros</div><div class="value" style="font-size:1.6rem">${baseList.length}</div><div class="sub">de ${data.length} total</div></div>`;
+  }
+
   document.getElementById('cm-cards-'+menuId).innerHTML = `
     <div class="card green"><div class="label">Ingresos</div><div class="value">${fmt(inc)}</div>${curMM?renderPctBadge(inc,prevInc):'<div class="sub">'+periodLabel+'</div>'}</div>
     <div class="card red"><div class="label">Gastos</div><div class="value">${fmt(exp)}</div>${curMM?renderPctBadge(exp,prevExp,true):'<div class="sub">'+periodLabel+'</div>'}</div>
     <div class="card ${net>=0?'blue':'red'}"><div class="label">Balance</div><div class="value" style="font-size:1.35rem">${net>=0?'+':''}${fmt(Math.abs(net))}</div><div class="sub">${periodLabel}</div></div>
-    <div class="card purple"><div class="label">Registros</div><div class="value" style="font-size:1.6rem">${baseList.length}</div><div class="sub">de ${data.length} total</div></div>`;
+    ${_cmFourthCard}`;
 
   // Chart monthly — siempre sobre todos los meses para ver tendencia completa
   const months = [...new Set(data.map(t=>t.date.substring(5,7)))].sort();
@@ -4128,16 +4175,22 @@ function renderCustomMenuView(menuId) {
   if (customCharts[menuId].cat) customCharts[menuId].cat.destroy();
   customCharts[menuId].cat=new Chart(ctx2,{type:'doughnut',data:{labels:sorted.map(([c])=>catLabel(c)),datasets:[{data:sorted.map(([,v])=>v),backgroundColor:colors,borderWidth:2,borderColor:'#1e293b'}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}}}}});
 
+  customCharts[menuId].weekly = renderWeeklyChart(baseList, 'cm-chart-weekly-'+menuId, customCharts[menuId].weekly);
+
   // Tabla filtrada
   let list = [...data];
   const s=(document.getElementById('cmf-search-'+menuId).value||'').toLowerCase();
   const tp=document.getElementById('cmf-type-'+menuId).value;
   const cat=(document.getElementById('cmf-cat-'+menuId)?.value||'');
   const mm=document.getElementById('cmf-month-'+menuId).value;
+  const df=(document.getElementById('cmf-date-from-'+menuId)?.value||'');
+  const dt=(document.getElementById('cmf-date-to-'+menuId)?.value||'');
   if (s) list=list.filter(t=>t.description.toLowerCase().includes(s));
   if (tp) list=list.filter(t=>t.type===tp);
   if (cat) list=list.filter(t=>t.category===cat);
   if (mm) list=list.filter(t=>t.date.substring(5,7)===mm);
+  if (df) list=list.filter(t=>t.date>=df);
+  if (dt) list=list.filter(t=>t.date<=dt);
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
   const { order: cmOrd, hidden: cmHid } = getColConfig('custom');
@@ -5589,14 +5642,72 @@ function exportCSV() {
   a.click();
 }
 
+function _downloadCSV(list, filename, labelFn) {
+  list.sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  const esc = v => '"' + String(v||'').replace(/"/g,'""') + '"';
+  const header = ['Fecha','Monto','Tipo','Categoría','Descripción','Notas','Recurrencia'];
+  const rows = list.map(t=>[
+    t.date,
+    (t.type==='income'?'':'-') + t.amount.toFixed(2),
+    t.type==='income'?'Ingreso':'Gasto',
+    labelFn(t.category),
+    t.description,
+    t.notes||'',
+    t.recurring||''
+  ].map(esc).join(','));
+  const csv = [header.join(','), ...rows].join('\r\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+function exportHomeCSV() {
+  let list = [...homeTxs];
+  const s   = document.getElementById('hf-search')?.value.toLowerCase() || '';
+  const tp  = document.getElementById('hf-type')?.value || '';
+  const cat = document.getElementById('hf-cat')?.value || '';
+  const mm  = document.getElementById('hf-month')?.value || '';
+  const df  = document.getElementById('hf-date-from')?.value || '';
+  const dt  = document.getElementById('hf-date-to')?.value || '';
+  if (s)  list = list.filter(t=>t.description.toLowerCase().includes(s)||(t.notes||'').toLowerCase().includes(s));
+  if (tp) list = list.filter(t=>t.type===tp);
+  if (cat)list = list.filter(t=>t.category===cat);
+  if (mm) list = list.filter(t=>t.date.substring(5,7)===mm);
+  if (df) list = list.filter(t=>t.date>=df);
+  if (dt) list = list.filter(t=>t.date<=dt);
+  _downloadCSV(list, `cashmap-home-${mm||'todo'}-${new Date().toISOString().slice(0,10)}.csv`, k=>catLabel(k));
+}
+
+function exportCustomCSV(menuId) {
+  const m = customMenus.find(x=>x.id===menuId);
+  if (!m) return;
+  let list = [...(m.data||[])];
+  const s   = document.getElementById('cmf-search-'+menuId)?.value.toLowerCase() || '';
+  const tp  = document.getElementById('cmf-type-'+menuId)?.value || '';
+  const cat = document.getElementById('cmf-cat-'+menuId)?.value || '';
+  const mm  = document.getElementById('cmf-month-'+menuId)?.value || '';
+  const df  = document.getElementById('cmf-date-from-'+menuId)?.value || '';
+  const dt  = document.getElementById('cmf-date-to-'+menuId)?.value || '';
+  if (s)  list = list.filter(t=>t.description.toLowerCase().includes(s));
+  if (tp) list = list.filter(t=>t.type===tp);
+  if (cat)list = list.filter(t=>t.category===cat);
+  if (mm) list = list.filter(t=>t.date.substring(5,7)===mm);
+  if (df) list = list.filter(t=>t.date>=df);
+  if (dt) list = list.filter(t=>t.date<=dt);
+  _downloadCSV(list, `cashmap-${m.name.replace(/\s+/g,'-').toLowerCase()}-${mm||'todo'}-${new Date().toISOString().slice(0,10)}.csv`, k=>catLabel(k));
+}
+
 // ============================================================
 // FEATURE 8 — VISTA SEMANAL
 // ============================================================
 let _weeklyChart = null;
-function renderWeeklyChart(list) {
-  const canvas = document.getElementById('chart-weekly');
-  if (!canvas) return;
-  if (_weeklyChart) { try { _weeklyChart.destroy(); } catch(e){} _weeklyChart = null; }
+function renderWeeklyChart(list, canvasId, prevChart) {
+  canvasId = canvasId || 'chart-weekly';
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return prevChart || null;
+  if (prevChart) { try { prevChart.destroy(); } catch(e){} }
   const weeks = ['Sem 1 (1-7)','Sem 2 (8-14)','Sem 3 (15-21)','Sem 4 (22+)'];
   const weekInc = [0,0,0,0];
   const weekExp = [0,0,0,0];
@@ -5606,7 +5717,7 @@ function renderWeeklyChart(list) {
     if (t.type==='income') weekInc[w]+=t.amount;
     else weekExp[w]+=t.amount;
   });
-  _weeklyChart = new Chart(canvas, {
+  return new Chart(canvas, {
     type:'bar',
     data:{
       labels: weeks,
