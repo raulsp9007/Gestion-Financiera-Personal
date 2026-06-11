@@ -1772,10 +1772,12 @@ function getColConfig(tableId) {
   try {
     const stored = JSON.parse(localStorage.getItem('cashmap_col_config') || '{}');
     const cfg = stored[tableId] || {};
-    return {
-      order:  cfg.order  && cfg.order.length  ? cfg.order  : [...COL_DEFAULTS[tableId]],
-      hidden: cfg.hidden || [],
-    };
+    let order = cfg.order && cfg.order.length ? cfg.order : [...COL_DEFAULTS[tableId]];
+    // Append new columns added to COL_DEFS after the user saved their config
+    const allKeys = Object.keys(COL_DEFS[tableId] || {});
+    const newCols = allKeys.filter(k => !order.includes(k));
+    if (newCols.length) order = [...order, ...newCols];
+    return { order, hidden: cfg.hidden || [] };
   } catch(e) { return { order: [...COL_DEFAULTS[tableId]], hidden: [] }; }
 }
 
