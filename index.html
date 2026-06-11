@@ -1819,8 +1819,11 @@ const SAVE_DELAY = 900;
 // URL del backend GAS — ya no está hardcodeada en el código.
 // Se guarda en localStorage('cashmap_api_url') para que el repo pueda ser público.
 // null = nunca configurada (muestra setup screen), '' = modo local, 'https://...' = backend activo.
+let _cachedApiUrl;
 function getApiUrl() {
-  return localStorage.getItem('cashmap_api_url'); // null si nunca se configuró
+  if (_cachedApiUrl !== undefined) return _cachedApiUrl;
+  _cachedApiUrl = localStorage.getItem('cashmap_api_url');
+  return _cachedApiUrl;
 }
 
 // Clave para cache offline en localStorage
@@ -1829,8 +1832,10 @@ const CACHE_TS_KEY = 'cashmap_data_ts';
 
 let deferredInstallPrompt = null;
 let pendingOfflineChanges = false;
-let _pollTimer = null;         // handle del intervalo de polling de sync
-let _pendingLocalChanges = false; // true mientras debounce no ha disparado pushToDrive
+let _pollTimer = null;
+let _pendingLocalChanges = false;
+let _applyingRemote = false;
+let _renderPending = false;
 // BroadcastChannel: sync instantáneo entre pestañas del mismo navegador
 const _bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('cashmap-sync') : null;
 if (_bc) {
@@ -2050,7 +2055,9 @@ function isModalOpen() {
 // Aplica datos recibidos de otro dispositivo/pestaña sin reiniciar auth
 function applyRemoteData(data) {
   if (!data || data.error) return;
-  if (_pendingLocalChanges) return; // cambios locales sin guardar — ignorar remote
+  if (_pendingLocalChanges) return;
+  if (_applyingRemote) return;
+  _applyingRemote = true;
   if (Array.isArray(data.transactions)) txs = data.transactions;
   if (Array.isArray(data.deudas)) deudas = data.deudas;
   if (Array.isArray(data.home)) homeTxs = data.home;
@@ -2075,6 +2082,7 @@ function applyRemoteData(data) {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
   } catch(e) {}
+  _applyingRemote = false;
   renderAll();
   showToast('🔄 Datos actualizados', 'var(--green)', 2500);
 }
@@ -2099,7 +2107,7 @@ function startSyncPoller() {
     } else {
       const url = getApiUrl();
       if (!url) return;
-      fetch(url + '?action=load')
+      fetch(url + '?action=load&since=' + encodeURIComponent(lastUpdatedStr))
         .then(r => r.json())
         .then(data => {
           if (data && !data.error && data.lastUpdated > lastUpdatedStr) applyRemoteData(data);
@@ -2114,7 +2122,6 @@ function startSyncPoller() {
     _pollTimer = setTimeout(() => { poll(); scheduleNext(); }, delay);
   }
 
-  // Reiniciar intervalo inmediato al volver a la pestaña
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       clearTimeout(_pollTimer);
@@ -2123,6 +2130,8 @@ function startSyncPoller() {
       scheduleNext();
     }
   });
+
+  window.addEventListener('beforeunload', () => clearTimeout(_pollTimer), {once:true});
 
   scheduleNext();
 }
@@ -2233,12 +2242,17 @@ function availableMonths() {
 // RENDER ALL
 // ============================================================
 function renderAll() {
-  try { renderDash(); } catch(e) { console.warn('renderDash error:', e); }
-  try { renderMonthly(); } catch(e) { console.warn('renderMonthly error:', e); }
-  try { renderHistory(); } catch(e) { console.warn('renderHistory error:', e); }
-  try { renderBalance(); } catch(e) { console.warn('renderBalance error:', e); }
-  renderDeudas();
-  try { renderHome(); } catch(e) { console.warn('renderHome error:', e); }
+  if (_renderPending) return;
+  _renderPending = true;
+  requestAnimationFrame(() => {
+    _renderPending = false;
+    try { renderDash(); } catch(e) { console.warn('renderDash error:', e); }
+    try { renderMonthly(); } catch(e) { console.warn('renderMonthly error:', e); }
+    try { renderHistory(); } catch(e) { console.warn('renderHistory error:', e); }
+    try { renderBalance(); } catch(e) { console.warn('renderBalance error:', e); }
+    renderDeudas();
+    try { renderHome(); } catch(e) { console.warn('renderHome error:', e); }
+  });
 }
 
 // ============================================================
@@ -3783,8 +3797,12 @@ function buildSidebarNav() {
 // ============================================================
 // CUSTOM MENUS — BUILD & RENDER
 // ============================================================
+let _customMenusSnapshot = '';
 function buildCustomMenuViews() {
   const slot = document.getElementById('custom-views-slot');
+  const snapshot = JSON.stringify(customMenus.map(({charts,...r}) => r));
+  if (snapshot === _customMenusSnapshot && slot.children.length === customMenus.length) return;
+  _customMenusSnapshot = snapshot;
   slot.innerHTML = '';
 
   customMenus.forEach(m => {
