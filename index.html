@@ -659,7 +659,10 @@
     #bottom-nav a.active{color:#fff}
     #bottom-nav a.active .bn-ico{transform:scale(1.14)}
     #bottom-nav a:active .bn-ico{transform:scale(.9)}
-    #bn-user-btn{background:none;border:none;border-left:1px solid rgba(255,255,255,.07)}
+    #bn-user-btn{background:none;border:none;border-left:1px solid rgba(255,255,255,.07);flex:0 0 52px!important}
+    #bn-user-btn .bn-ico{font-size:1rem;width:24px;height:24px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;line-height:1}
+    /* Ocultar botón de orden del dashboard en mobile (admin usa desktop) */
+    [onclick="openDashOrderModal()"]{display:none!important}
 
     /* ── FAB ─────────────────────────────────────────────────── */
     #fab{
@@ -1571,13 +1574,13 @@
 
 <!-- BOTTOM NAV (mobile only) -->
 <nav id="bottom-nav">
-  <a class="active" data-view="view-dashboard" onclick="switchView(this)">
+  <a id="bn-dashboard" class="active" data-view="view-dashboard" onclick="switchView(this)">
     <span class="bn-ico">📊</span>Dashboard
   </a>
-  <a data-view="view-deudas" onclick="switchView(this)">
+  <a id="bn-deudas" data-view="view-deudas" onclick="switchView(this)">
     <span class="bn-ico">💳</span>Deudas
   </a>
-  <a data-view="view-home" onclick="switchView(this)">
+  <a id="bn-home" data-view="view-home" onclick="switchView(this)">
     <span class="bn-ico">🏠</span>Home
   </a>
   <a id="bn-more" onclick="toggleMoreDrawer()" style="display:none">
@@ -3560,8 +3563,14 @@ function isReadOnly() {
 
 function renderNavForUser() {
   buildSidebarNav();
-  // Bottom-nav "Más" visible si hay custom menus accesibles y no ocultos
   const hidden = (currentUser && currentUser.role !== 'admin') ? (currentUser.hiddenMenus || []) : [];
+  // Ocultar items estáticos del bottom-nav según hiddenMenus
+  const bnStaticMap = { dashboard:'bn-dashboard', deudas:'bn-deudas', home:'bn-home' };
+  Object.entries(bnStaticMap).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = hidden.includes(key) ? 'none' : '';
+  });
+  // Bottom-nav "Más" visible si hay custom menus accesibles y no ocultos
   const accessible = customMenus.filter(m=>canAccess(m.access) && !hidden.includes('custom-'+m.id));
   const bnMore = document.getElementById('bn-more');
   if (bnMore) bnMore.style.display = accessible.length ? '' : 'none';
