@@ -2078,9 +2078,10 @@ function startSyncPoller() {
       fetch(url + '?action=load')
         .then(r => r.json())
         .then(data => {
+          console.log('[Sync] poll →', data?.lastUpdated, '| local:', lastUpdatedStr, '| newer:', data?.lastUpdated > lastUpdatedStr);
           if (data && !data.error && data.lastUpdated > lastUpdatedStr) applyRemoteData(data);
         })
-        .catch(() => {});
+        .catch(err => console.warn('[Sync] poll error:', err));
     }
   }, 20000);
 }
