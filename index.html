@@ -4562,14 +4562,21 @@ function initPWA() {
 
   // Registrar Service Worker (solo en modo self-hosted)
   if ('serviceWorker' in navigator && !inAppsScript) {
-    navigator.serviceWorker.register('./cashmap_sw.js', {scope:'./'})
+    navigator.serviceWorker.register('./cashmap_sw.js', { scope: './', updateViaCache: 'none' })
       .then(reg => {
         console.log('[CashMap SW] Registrado, scope:', reg.scope);
-        reg.addEventListener('updatefound', () => {
-          showToast('🔄 Actualización disponible — recarga para aplicar');
-        });
+        // Verificar actualizaciones inmediatamente al cargar
+        reg.update();
       })
       .catch(err => console.warn('[CashMap SW] No disponible:', err));
+
+    // Recargar automáticamente cuando el nuevo SW activa y envía SW_UPDATED
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data && e.data.type === 'SW_UPDATED') {
+        console.log('[CashMap SW] Nueva versión activa — recargando...');
+        window.location.reload();
+      }
+    });
   }
 
   // Capturar prompt de instalación
