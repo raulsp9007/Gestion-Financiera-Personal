@@ -795,6 +795,31 @@
   .budget-bar-fill{height:100%;border-radius:2px;transition:width .4s}
   .budget-bar-fill.ok{background:var(--green)}.budget-bar-fill.warn{background:var(--yellow)}.budget-bar-fill.over{background:var(--red)}
   .budget-bar-lbl{font-size:.65rem;color:var(--text2);display:flex;justify-content:space-between}
+  /* Metas de ahorro */
+  .goals-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:16px}
+  .goal-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .goal-card-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .goal-icon{font-size:1.2rem;width:34px;height:34px;background:var(--bg3);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .goal-name{font-size:.9rem;font-weight:700;flex:1}
+  .goal-pct{font-size:.78rem;font-weight:700}
+  .goal-progress{height:7px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-bottom:6px}
+  .goal-progress-fill{height:100%;border-radius:99px;transition:width .4s}
+  .goal-amounts{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text2)}
+  .goal-deadline{font-size:.7rem;color:var(--text2);margin-top:4px}
+  .goal-actions{display:flex;gap:6px;margin-top:10px}
+  /* Comparativa mes */
+  .cmp-delta{font-size:.7rem;font-weight:600;margin-top:3px}
+  .cmp-delta.up{color:var(--red)}.cmp-delta.down{color:var(--green)}.cmp-delta.neu{color:var(--text2)}
+  .cmp-delta.up.inv{color:var(--green)}.cmp-delta.down.inv{color:var(--red)}
+  /* Vista semanal */
+  .weekly-wrap{margin:14px 0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .weekly-wrap h4{font-size:.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;font-weight:600}
+  /* Proyección */
+  .card .proj-lbl{font-size:.65rem;color:var(--text2);margin-top:3px}
+  /* Alert badge presupuesto */
+  .budget-alert-badge{display:inline-block;font-size:.62rem;font-weight:700;padding:1px 6px;border-radius:99px;margin-left:4px;vertical-align:middle}
+  .budget-alert-badge.warn{background:rgba(245,158,11,.2);color:var(--yellow)}
+  .budget-alert-badge.over{background:rgba(239,68,68,.2);color:var(--red)}
 
   /* 5: Recurring indicator */
   .rec-badge{display:inline-flex;align-items:center;gap:3px;font-size:.65rem;padding:1px 6px;border-radius:99px;background:rgba(139,92,246,.15);color:#a78bfa;font-weight:600;margin-left:4px}
@@ -896,6 +921,7 @@
         <span id="dash-last-updated" style="font-size:.7rem;color:var(--text2);opacity:.7"></span>
         <button class="btn btn-ghost col-cfg-btn" onclick="openDashOrderModal()" style="font-size:.75rem;padding:3px 8px" title="Reordenar secciones del dashboard">⚙️ Orden</button>
       </div>
+      <div id="dash-goals"></div>
       <div id="dash-custom-menus"></div>
     </div>
 
@@ -903,6 +929,10 @@
     <div id="view-monthly" class="view">
       <div class="month-tabs" id="month-tabs"></div>
       <div class="cards" id="month-cards"></div>
+      <div class="weekly-wrap">
+        <h4>Gastos por semana</h4>
+        <canvas id="chart-weekly" style="max-height:160px"></canvas>
+      </div>
       <div class="tbl-wrap">
         <div class="tbl-header">
           <h3 id="month-tbl-title">Transacciones</h3>
@@ -930,7 +960,7 @@
         <select id="f-cat" onchange="renderHistory();updateFilterCount('hist-filter-count','f-search','f-type','f-cat','f-month')">
           <option value="">Todas las categorías</option>
         </select>
-        <select id="f-month" onchange="renderHistory();updateFilterCount('hist-filter-count','f-search','f-type','f-cat','f-month')">
+        <select id="f-month" onchange="renderHistory();updateFilterCount('hist-filter-count','f-search','f-type','f-cat','f-month','f-date-from','f-date-to')">
           <option value="">Todos los meses</option>
           <option value="01">Enero</option><option value="02">Febrero</option>
           <option value="03">Marzo</option><option value="04">Abril</option>
@@ -939,12 +969,15 @@
           <option value="09">Septiembre</option><option value="10">Octubre</option>
           <option value="11">Noviembre</option><option value="12">Diciembre</option>
         </select>
+        <input type="date" id="f-date-from" placeholder="Desde" title="Fecha desde" oninput="renderHistory();updateFilterCount('hist-filter-count','f-search','f-type','f-cat','f-month','f-date-from','f-date-to')" style="font-size:.82rem">
+        <input type="date" id="f-date-to"   placeholder="Hasta" title="Fecha hasta" oninput="renderHistory();updateFilterCount('hist-filter-count','f-search','f-type','f-cat','f-month','f-date-from','f-date-to')" style="font-size:.82rem">
       </div>
       <div class="tbl-wrap">
         <div class="tbl-header">
           <h3>Historial completo</h3>
           <div style="display:flex;align-items:center;gap:8px">
             <span id="hist-count" style="font-size:.78rem;color:var(--text2)"></span>
+            <button class="btn btn-ghost" onclick="exportCSV()" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
             <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('history')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
           </div>
         </div>
@@ -1568,6 +1601,36 @@
   </div>
 </div>
 
+<!-- Modal metas de ahorro -->
+<div class="modal-overlay" id="goals-modal">
+  <div class="modal" style="width:440px;max-width:98vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="margin:0" id="goals-modal-title">🎯 Nueva meta</h3>
+      <button class="btn btn-ghost" onclick="closeGoalModal()" style="padding:4px 10px">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:60px 1fr;gap:8px;margin-bottom:10px">
+      <div class="form-row" style="margin:0"><label style="font-size:.74rem">Icono</label><input type="text" id="gf-icon" placeholder="🎯" style="text-align:center;font-size:1.2rem"></div>
+      <div class="form-row" style="margin:0"><label style="font-size:.74rem">Nombre</label><input type="text" id="gf-name" placeholder="Ej: Vacaciones, Auto..."></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div class="form-row" style="margin:0"><label style="font-size:.74rem">Meta ($)</label><input type="number" id="gf-target" placeholder="5000" min="1" step="0.01"></div>
+      <div class="form-row" style="margin:0"><label style="font-size:.74rem">Acumulado ($)</label><input type="number" id="gf-current" placeholder="0" min="0" step="0.01"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div class="form-row" style="margin:0"><label style="font-size:.74rem">Fecha límite</label><input type="date" id="gf-deadline"></div>
+      <div class="form-row" style="margin:0"><label style="font-size:.74rem">Color</label><input type="color" id="gf-color" value="#22c55e" style="width:100%;height:36px;border:none;background:none;cursor:pointer"></div>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between">
+      <button class="btn btn-ghost" id="gf-del-btn" onclick="deleteGoal()" style="color:var(--red);border-color:var(--red);display:none">🗑 Eliminar</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="closeGoalModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveGoal()">Guardar</button>
+      </div>
+    </div>
+    <input type="hidden" id="gf-id">
+  </div>
+</div>
+
 <!-- Skeleton overlay (visible solo durante carga) -->
 <div id="skeleton-overlay">
   <div class="cards">
@@ -1703,6 +1766,8 @@ let customMenus = [];  // [{id, name, icon, currency, pin, access, catsInc, cats
 let navOrder = [];     // ['dashboard','deudas','home','custom-1',...]
 let sessionSeed = ''; // token de invalidación global — si cambia, todas las sesiones expiran
 let budgets = {};     // {catKey: {monthly: amount}} — presupuesto mensual por categoría
+let savingsGoals = []; // [{id, name, icon, target, current, deadline, color}]
+let _nextGoalId  = 1;
 
 const STATIC_NAV = {
   dashboard: { label: 'Inicio',   ico: '📊', view: 'view-dashboard' },
@@ -1919,6 +1984,7 @@ function initFromDrive(data) {
     if (c.sessionSeed) sessionSeed = c.sessionSeed;
     else { sessionSeed = Date.now().toString(36); }
     if (c.budgets) budgets = c.budgets;
+    if (c.savingsGoals) { savingsGoals = c.savingsGoals; if (savingsGoals.length) _nextGoalId = Math.max(...savingsGoals.map(g=>g.id))+1; }
     if (c.colConfig && Object.keys(c.colConfig).length)
       localStorage.setItem('cashmap_col_config', JSON.stringify(c.colConfig));
     if (c.forceReloadTs) forceReloadTs = c.forceReloadTs;
@@ -1940,7 +2006,7 @@ function initFromDrive(data) {
   try {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,sessionSeed:sessionSeed,budgets:budgets,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder}
+      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder}
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
@@ -1972,7 +2038,7 @@ function pushToDrive() {
     version: 1,
     lastUpdated: new Date().toISOString(),
     config: {
-      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, sessionSeed:sessionSeed, budgets:budgets,
+      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, sessionSeed:sessionSeed, budgets:budgets, savingsGoals:savingsGoals,
       colConfig: JSON.parse(localStorage.getItem('cashmap_col_config') || '{}'),
       forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder
     },
@@ -2077,6 +2143,7 @@ function applyRemoteData(data) {
       renderNavForUser();
     }
     if (c.budgets) budgets = c.budgets;
+    if (c.savingsGoals) { savingsGoals = c.savingsGoals; if (savingsGoals.length) _nextGoalId = Math.max(...savingsGoals.map(g=>g.id))+1; }
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
   }
   if (data.lastUpdated) lastUpdatedStr = data.lastUpdated;
@@ -2261,6 +2328,7 @@ function renderAll() {
 // DASHBOARD
 // ============================================================
 function renderDash() {
+  renderSavingsGoals();
   renderDashCustomMenus();
 }
 
@@ -2492,12 +2560,32 @@ function renderMonthly() {
   const list = txs.filter(t=>txMonth(t)===currentMonth).sort((a,b)=>b.date.localeCompare(a.date));
   const {inc,exp,net} = monthSummary(list);
 
+  // Comparativa mes anterior
+  const prevMM = String(parseInt(currentMonth)-1||12).padStart(2,'0');
+  const prevList = txs.filter(t=>txMonth(t)===prevMM);
+  const {inc:pInc, exp:pExp} = monthSummary(prevList);
+  const delta = (cur,prev,inv=false) => {
+    if (!prev) return '';
+    const d = cur - prev; const pct = Math.round(Math.abs(d)/prev*100);
+    const dir = d>0?'up':d<0?'down':'neu';
+    const arrow = d>0?'↑':d<0?'↓':'→';
+    return `<div class="cmp-delta ${dir}${inv?' inv':''}">${arrow} ${pct}% vs ${monthName(prevMM)}</div>`;
+  };
+
+  // Proyección fin de mes
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), parseInt(currentMonth), 0).getDate();
+  const dayOfMonth  = today.getDate();
+  const projExp = dayOfMonth > 0 ? Math.round((exp / dayOfMonth) * daysInMonth * 100)/100 : exp;
+  const projNet = inc - projExp;
+
   document.getElementById('month-cards').innerHTML = `
-    <div class="card green"><div class="label">Ingresos</div><div class="value">${fmt(inc)}</div></div>
-    <div class="card red"><div class="label">Gastos</div><div class="value">${fmt(exp)}</div></div>
+    <div class="card green"><div class="label">Ingresos</div><div class="value">${fmt(inc)}</div>${delta(inc,pInc,true)}</div>
+    <div class="card red"><div class="label">Gastos</div><div class="value">${fmt(exp)}</div>${delta(exp,pExp)}</div>
     <div class="card ${net>=0?'blue':'red'}"><div class="label">Neto</div><div class="value">${fmtSigned(net)}</div></div>
-    <div class="card"><div class="label">Transacciones</div><div class="value" style="color:var(--text)">${list.length}</div></div>
+    <div class="card ${projNet>=0?'':'red'}"><div class="label">Proyección al ${daysInMonth}</div><div class="value" style="font-size:1.2rem;color:var(--text2)">${fmtSigned(projNet)}</div><div class="proj-lbl">gasto est. ${fmt(projExp)}</div></div>
   `;
+  renderWeeklyChart(list);
 
   document.getElementById('month-tbl-title').textContent = monthName(currentMonth) + ' 2026 – ' + list.length + ' transacciones';
   document.getElementById('month-tbody').innerHTML = list.length ? list.map(t=>`
@@ -2538,10 +2626,14 @@ function renderHistory() {
   const tp = document.getElementById('f-type').value;
   const cat = document.getElementById('f-cat').value;
   const mm = document.getElementById('f-month').value;
-  if (s) list = list.filter(t=>t.description.toLowerCase().includes(s)||(t.notes||'').toLowerCase().includes(s));
+  const df = document.getElementById('f-date-from')?.value;
+  const dt = document.getElementById('f-date-to')?.value;
+  if (s)  list = list.filter(t=>t.description.toLowerCase().includes(s)||(t.notes||'').toLowerCase().includes(s));
   if (tp) list = list.filter(t=>t.type===tp);
   if (cat) list = list.filter(t=>t.category===cat);
   if (mm) list = list.filter(t=>txMonth(t)===mm);
+  if (df) list = list.filter(t=>t.date>=df);
+  if (dt) list = list.filter(t=>t.date<=dt);
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
   const { order: hOrd, hidden: hHid } = getColConfig('history');
@@ -2735,6 +2827,7 @@ function saveTx() {
   closeTxModal();
   renderAll();
   scheduleSave();
+  checkBudgetAlerts();
 }
 
 // Abre modal de transacción pre-llenado desde una deuda
@@ -3052,6 +3145,7 @@ function saveHomeTx() {
   closeHomeTxModal();
   renderHome();
   scheduleSave();
+  checkBudgetAlerts();
 }
 
 function deleteHomeTx() {
@@ -4093,6 +4187,7 @@ function saveCustomTx(menuId) {
   closeHomeTxModal();
   renderCustomMenuView(menuId);
   scheduleSave();
+  checkBudgetAlerts();
 }
 
 function deleteCustomTx(menuId, txId) {
@@ -5374,6 +5469,213 @@ function saveDashOrderModal() {
 // click-outside dash-order-modal
 document.getElementById('dash-order-modal').addEventListener('click', function(e) {
   if (e.target === this) closeDashOrderModal();
+});
+
+// ============================================================
+// FEATURE 1 — ALERTAS DE PRESUPUESTO
+// ============================================================
+let _alertedBudgets = {};
+function checkBudgetAlerts() {
+  const curMM = String(new Date().getMonth()+1).padStart(2,'0');
+  Object.entries(budgets).forEach(([k, b]) => {
+    if (!b || !b.monthly) return;
+    const spent = [...txs,...homeTxs,...customMenus.flatMap(m=>m.data||[])]
+      .filter(t=>t.category===k && t.type==='expense' && t.date.substring(5,7)===curMM)
+      .reduce((s,t)=>s+t.amount,0);
+    const pct = spent / b.monthly * 100;
+    const prev = _alertedBudgets[k] || 0;
+    const lbl = catLabel(k);
+    if (pct >= 100 && prev < 100) {
+      showToast(`🚨 Presupuesto agotado: ${lbl} (${fmt(spent)} / ${fmt(b.monthly)})`, 'var(--red)', 4000);
+      _alertedBudgets[k] = 100;
+    } else if (pct >= 80 && prev < 80) {
+      showToast(`⚠️ ${lbl} al ${Math.round(pct)}% del presupuesto`, 'var(--yellow)', 3500);
+      _alertedBudgets[k] = 80;
+    } else if (pct < 80) {
+      delete _alertedBudgets[k];
+    }
+  });
+}
+
+// ============================================================
+// FEATURE 7 — EXPORTAR CSV
+// ============================================================
+function exportCSV() {
+  let list = [...txs];
+  const s  = document.getElementById('f-search')?.value.toLowerCase() || '';
+  const tp = document.getElementById('f-type')?.value || '';
+  const cat= document.getElementById('f-cat')?.value || '';
+  const mm = document.getElementById('f-month')?.value || '';
+  const df = document.getElementById('f-date-from')?.value || '';
+  const dt = document.getElementById('f-date-to')?.value || '';
+  if (s)  list = list.filter(t=>t.description.toLowerCase().includes(s)||(t.notes||'').toLowerCase().includes(s));
+  if (tp) list = list.filter(t=>t.type===tp);
+  if (cat)list = list.filter(t=>t.category===cat);
+  if (mm) list = list.filter(t=>txMonth(t)===mm);
+  if (df) list = list.filter(t=>t.date>=df);
+  if (dt) list = list.filter(t=>t.date<=dt);
+  list.sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  const esc = v => '"' + String(v||'').replace(/"/g,'""') + '"';
+  const header = ['Fecha','Monto','Tipo','Categoría','Descripción','Notas','Recurrencia'];
+  const rows = list.map(t=>[
+    t.date,
+    (t.type==='income'?'':'-') + t.amount.toFixed(2),
+    t.type==='income'?'Ingreso':'Gasto',
+    catLabel(t.category),
+    t.description,
+    t.notes||'',
+    t.recurring||''
+  ].map(esc).join(','));
+  const csv = [header.join(','), ...rows].join('\r\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `cashmap-${mm||'todo'}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ============================================================
+// FEATURE 8 — VISTA SEMANAL
+// ============================================================
+let _weeklyChart = null;
+function renderWeeklyChart(list) {
+  const canvas = document.getElementById('chart-weekly');
+  if (!canvas) return;
+  if (_weeklyChart) { try { _weeklyChart.destroy(); } catch(e){} _weeklyChart = null; }
+  const weeks = ['Sem 1 (1-7)','Sem 2 (8-14)','Sem 3 (15-21)','Sem 4 (22+)'];
+  const weekInc = [0,0,0,0];
+  const weekExp = [0,0,0,0];
+  list.forEach(t => {
+    const d = parseInt(t.date.substring(8,10));
+    const w = d<=7?0:d<=14?1:d<=21?2:3;
+    if (t.type==='income') weekInc[w]+=t.amount;
+    else weekExp[w]+=t.amount;
+  });
+  _weeklyChart = new Chart(canvas, {
+    type:'bar',
+    data:{
+      labels: weeks,
+      datasets:[
+        {label:'Ingresos', data:weekInc, backgroundColor:'rgba(34,197,94,.7)', borderRadius:6},
+        {label:'Gastos',   data:weekExp, backgroundColor:'rgba(239,68,68,.7)',  borderRadius:6}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{legend:{labels:{color:'#94a3b8',font:{size:10}}}},
+      scales:{
+        x:{ticks:{color:'#94a3b8',font:{size:10}}, grid:{color:'rgba(255,255,255,.05)'}},
+        y:{ticks:{color:'#94a3b8',font:{size:10}, callback:v=>'$'+v.toLocaleString()}, grid:{color:'rgba(255,255,255,.05)'}}
+      }
+    }
+  });
+}
+
+// ============================================================
+// FEATURE 5 — METAS DE AHORRO
+// ============================================================
+function renderSavingsGoals() {
+  const wrap = document.getElementById('dash-goals');
+  if (!wrap) return;
+  if (!savingsGoals.length) { wrap.innerHTML=''; return; }
+  const cards = savingsGoals.map(g => {
+    const pct = Math.min(100, g.target>0 ? Math.round(g.current/g.target*100) : 0);
+    const remaining = g.target - g.current;
+    let deadlineStr = '';
+    if (g.deadline) {
+      const d = new Date(g.deadline+'T00:00:00');
+      const today = new Date();
+      const days = Math.ceil((d-today)/86400000);
+      deadlineStr = `<div class="goal-deadline">📅 ${d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'})} ${days>0?'('+days+' días)':days===0?'(hoy)':'(vencida)'}</div>`;
+    }
+    return `<div class="goal-card">
+      <div class="goal-card-head">
+        <div class="goal-icon">${g.icon||'🎯'}</div>
+        <div class="goal-name">${g.name}</div>
+        <span class="goal-pct" style="color:${g.color||'#22c55e'}">${pct}%</span>
+        <button class="btn-icon" onclick="openGoalModal(${g.id})" title="Editar">✏️</button>
+      </div>
+      <div class="goal-progress"><div class="goal-progress-fill" style="width:${pct}%;background:${g.color||'#22c55e'}"></div></div>
+      <div class="goal-amounts"><span style="color:${g.color||'#22c55e'};font-weight:700">${fmt(g.current)}</span><span>${fmt(g.target)}</span></div>
+      ${remaining>0?`<div class="goal-amounts" style="margin-top:2px"><span style="color:var(--text2);font-size:.7rem">Faltan ${fmt(remaining)}</span></div>`:''}
+      ${deadlineStr}
+    </div>`;
+  }).join('');
+  wrap.innerHTML = `<div class="dcm-section">
+    <div class="dcm-section-title">
+      <span>🎯</span> Metas de ahorro
+      <button class="btn btn-ghost" onclick="openGoalModal(null)" style="font-size:.72rem;padding:2px 8px;margin-left:auto">+ Nueva</button>
+    </div>
+    <div class="goals-grid">${cards}</div>
+  </div>`;
+}
+
+let _editingGoalId = null;
+function openGoalModal(id) {
+  _editingGoalId = id;
+  const del = document.getElementById('gf-del-btn');
+  document.getElementById('gf-id').value = '';
+  document.getElementById('gf-icon').value = '';
+  document.getElementById('gf-name').value = '';
+  document.getElementById('gf-target').value = '';
+  document.getElementById('gf-current').value = '0';
+  document.getElementById('gf-deadline').value = '';
+  document.getElementById('gf-color').value = '#22c55e';
+  document.getElementById('goals-modal-title').textContent = '🎯 Nueva meta';
+  del.style.display = 'none';
+  if (id) {
+    const g = savingsGoals.find(x=>x.id===id);
+    if (!g) return;
+    document.getElementById('gf-id').value    = g.id;
+    document.getElementById('gf-icon').value  = g.icon||'';
+    document.getElementById('gf-name').value  = g.name;
+    document.getElementById('gf-target').value= g.target;
+    document.getElementById('gf-current').value=g.current;
+    document.getElementById('gf-deadline').value=g.deadline||'';
+    document.getElementById('gf-color').value = g.color||'#22c55e';
+    document.getElementById('goals-modal-title').textContent = '✏️ Editar meta';
+    del.style.display = 'inline-flex';
+  }
+  document.getElementById('goals-modal').classList.add('open');
+}
+function closeGoalModal() {
+  document.getElementById('goals-modal').classList.remove('open');
+  _editingGoalId = null;
+}
+function saveGoal() {
+  const name    = document.getElementById('gf-name').value.trim();
+  const target  = parseFloat(document.getElementById('gf-target').value);
+  const current = parseFloat(document.getElementById('gf-current').value)||0;
+  if (!name || isNaN(target) || target<=0) { showToast('Completa nombre y meta', 'var(--red)'); return; }
+  const goal = {
+    id:       _editingGoalId || _nextGoalId++,
+    icon:     document.getElementById('gf-icon').value.trim() || '🎯',
+    name, target, current,
+    deadline: document.getElementById('gf-deadline').value || '',
+    color:    document.getElementById('gf-color').value
+  };
+  if (_editingGoalId) {
+    const idx = savingsGoals.findIndex(g=>g.id===_editingGoalId);
+    if (idx>=0) savingsGoals[idx] = goal;
+  } else {
+    savingsGoals.push(goal);
+  }
+  closeGoalModal();
+  renderSavingsGoals();
+  scheduleSave();
+}
+function deleteGoal() {
+  if (!_editingGoalId) return;
+  showConfirm('¿Eliminar esta meta?', () => {
+    savingsGoals = savingsGoals.filter(g=>g.id!==_editingGoalId);
+    closeGoalModal();
+    renderSavingsGoals();
+    scheduleSave();
+  }, {icon:'🗑️', okLabel:'Eliminar'});
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const gm = document.getElementById('goals-modal');
+  if (gm) gm.addEventListener('click', e=>{ if(e.target===gm) closeGoalModal(); });
 });
 
 function openUserMenu() {
