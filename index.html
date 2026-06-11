@@ -2990,11 +2990,11 @@ function renderHome() {
 
   // % change vs previous period (B)
   const curMM = homeCurrentMonth;
-  let prevInc=0, prevExp=0;
+  let prevInc=0, prevExp=0, _hPrevM='';
   if (curMM) {
     const mm = parseInt(curMM);
-    const prevM = mm===1 ? '12' : String(mm-1).padStart(2,'0');
-    const prevList = homeTxs.filter(t=>t.date.substring(5,7)===prevM);
+    _hPrevM = mm===1 ? '12' : String(mm-1).padStart(2,'0');
+    const prevList = homeTxs.filter(t=>t.date.substring(5,7)===_hPrevM);
     prevInc = prevList.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
     prevExp = prevList.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   }
@@ -3012,8 +3012,8 @@ function renderHome() {
     _hFourthCard = `<div class="card purple"><div class="label">Registros</div><div class="value" style="font-size:1.6rem">${baseList.length}</div><div class="sub">de ${homeTxs.length} total</div></div>`;
   }
   document.getElementById('home-cards').innerHTML = `
-    <div class="card green"><div class="label">Ingresos</div><div class="value">${fmtH(inc)}</div>${curMM?renderPctBadge(inc,prevInc):'<div class="sub">'+periodLabel+'</div>'}</div>
-    <div class="card red"><div class="label">Gastos</div><div class="value">${fmtH(exp)}</div>${curMM?renderPctBadge(exp,prevExp,true):'<div class="sub">'+periodLabel+'</div>'}</div>
+    <div class="card green"><div class="label">Ingresos</div><div class="value">${fmtH(inc)}</div>${curMM?renderCmpDelta(inc,prevInc,_hPrevM):'<div class="sub">'+periodLabel+'</div>'}</div>
+    <div class="card red"><div class="label">Gastos</div><div class="value">${fmtH(exp)}</div>${curMM?renderCmpDelta(exp,prevExp,_hPrevM,true):'<div class="sub">'+periodLabel+'</div>'}</div>
     <div class="card ${net>=0?'blue':'red'}"><div class="label">Balance</div><div class="value" style="font-size:1.4rem">${net>=0?'+':''}${fmtH(net)}</div><div class="sub">${periodLabel}</div></div>
     ${_hFourthCard}
   `;
@@ -4131,11 +4131,11 @@ function renderCustomMenuView(menuId) {
     ? ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][parseInt(curMM)-1]
     : 'Todo el período';
 
-  let prevInc=0, prevExp=0;
+  let prevInc=0, prevExp=0, _cmPrevM='';
   if (curMM) {
     const mm = parseInt(curMM);
-    const prevM = mm===1 ? '12' : String(mm-1).padStart(2,'0');
-    const prevList = data.filter(t=>t.date.substring(5,7)===prevM);
+    _cmPrevM = mm===1 ? '12' : String(mm-1).padStart(2,'0');
+    const prevList = data.filter(t=>t.date.substring(5,7)===_cmPrevM);
     prevInc = prevList.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
     prevExp = prevList.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   }
@@ -4155,8 +4155,8 @@ function renderCustomMenuView(menuId) {
   }
 
   document.getElementById('cm-cards-'+menuId).innerHTML = `
-    <div class="card green"><div class="label">Ingresos</div><div class="value">${fmt(inc)}</div>${curMM?renderPctBadge(inc,prevInc):'<div class="sub">'+periodLabel+'</div>'}</div>
-    <div class="card red"><div class="label">Gastos</div><div class="value">${fmt(exp)}</div>${curMM?renderPctBadge(exp,prevExp,true):'<div class="sub">'+periodLabel+'</div>'}</div>
+    <div class="card green"><div class="label">Ingresos</div><div class="value">${fmt(inc)}</div>${curMM?renderCmpDelta(inc,prevInc,_cmPrevM):'<div class="sub">'+periodLabel+'</div>'}</div>
+    <div class="card red"><div class="label">Gastos</div><div class="value">${fmt(exp)}</div>${curMM?renderCmpDelta(exp,prevExp,_cmPrevM,true):'<div class="sub">'+periodLabel+'</div>'}</div>
     <div class="card ${net>=0?'blue':'red'}"><div class="label">Balance</div><div class="value" style="font-size:1.35rem">${net>=0?'+':''}${fmt(Math.abs(net))}</div><div class="sub">${periodLabel}</div></div>
     ${_cmFourthCard}`;
 
@@ -5289,6 +5289,17 @@ function renderPctBadge(curr, prev, invertColors) {
   if (invertColors) cls = pct > 0 ? 'down' : 'up';
   else cls = pct > 0 ? 'up' : 'down';
   return `<div class="pct-badge ${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</div>`;
+}
+
+function renderCmpDelta(cur, prev, prevMM, inv) {
+  if (prev === 0 && cur === 0) return '';
+  if (prev === 0) return `<div class="cmp-delta neu">nuevo</div>`;
+  const d = cur - prev;
+  if (Math.abs(d) < 0.01) return `<div class="cmp-delta neu">→ sin cambio</div>`;
+  const pct = Math.round(Math.abs(d) / prev * 100);
+  const dir = d > 0 ? 'up' : 'down';
+  const arrow = d > 0 ? '↑' : '↓';
+  return `<div class="cmp-delta ${dir}${inv?' inv':''}">${arrow} ${pct}% vs ${monthName(prevMM)}</div>`;
 }
 
 // ============================================================
