@@ -1583,15 +1583,7 @@
 
 <!-- BOTTOM NAV (mobile only) -->
 <nav id="bottom-nav">
-  <a id="bn-dashboard" class="active" data-view="view-dashboard" onclick="switchView(this)">
-    <span class="bn-ico">📊</span>Dashboard
-  </a>
-  <a id="bn-deudas" data-view="view-deudas" onclick="switchView(this)">
-    <span class="bn-ico">💳</span>Deudas
-  </a>
-  <a id="bn-home" data-view="view-home" onclick="switchView(this)">
-    <span class="bn-ico">🏠</span>Home
-  </a>
+  <!-- items dinámicos insertados por buildBottomNav() según navOrder -->
   <a id="bn-more" onclick="toggleMoreDrawer()" style="display:none">
     <span class="bn-ico">☰</span>Más
   </a>
@@ -3588,21 +3580,55 @@ function isReadOnly() {
 
 function renderNavForUser() {
   buildSidebarNav();
-  const hidden = (currentUser && currentUser.role !== 'admin') ? (currentUser.hiddenMenus || []) : [];
-  // Ocultar items estáticos del bottom-nav según hiddenMenus
-  const bnStaticMap = { dashboard:'bn-dashboard', deudas:'bn-deudas', home:'bn-home' };
-  Object.entries(bnStaticMap).forEach(([key, id]) => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = hidden.includes(key) ? 'none' : '';
-  });
-  // Bottom-nav "Más" visible si hay custom menus accesibles y no ocultos
-  const accessible = customMenus.filter(m=>canAccess(m.access) && !hidden.includes('custom-'+m.id));
-  const bnMore = document.getElementById('bn-more');
-  if (bnMore) bnMore.style.display = accessible.length ? '' : 'none';
-  buildMoreDrawer();
+  buildBottomNav();
   if (isReadOnly()) {
     document.querySelectorAll('#btn-new,#fab').forEach(b=>b.style.display='none');
   }
+}
+
+function buildBottomNav() {
+  const nav = document.getElementById('bottom-nav');
+  if (!nav) return;
+  const hidden = (currentUser && currentUser.role !== 'admin') ? (currentUser.hiddenMenus || []) : [];
+  const allKeys = ['dashboard','deudas','home','balance',...customMenus.map(m=>'custom-'+m.id)];
+  allKeys.forEach(k => { if (!navOrder.includes(k)) navOrder.push(k); });
+  const orderedVisible = navOrder.filter(k => allKeys.includes(k) && !hidden.includes(k));
+
+  // Eliminar items dinámicos previos
+  nav.querySelectorAll('a.bn-dyn').forEach(el => el.remove());
+
+  const MAX_BN = 3;
+  const mainItems  = orderedVisible.slice(0, MAX_BN);
+  const overflowItems = orderedVisible.slice(MAX_BN);
+
+  // Construir items principales
+  const html = mainItems.map(key => {
+    if (STATIC_NAV[key]) {
+      const {ico, label, view} = STATIC_NAV[key];
+      const isActive = currentView === view ? ' class="bn-dyn active"' : ' class="bn-dyn"';
+      return `<a${isActive} data-view="${view}" onclick="switchView(this)"><span class="bn-ico">${ico}</span>${label}</a>`;
+    }
+    const mid = parseInt(key.replace('custom-',''));
+    const m = customMenus.find(x=>x.id===mid);
+    if (!m || !canAccess(m.access)) return '';
+    const isActive = currentView === 'view-custom-'+m.id ? ' class="bn-dyn active"' : ' class="bn-dyn"';
+    return `<a${isActive} data-view="view-custom-${m.id}" data-custom-menu="${m.id}" onclick="checkPinAndSwitch(${m.id},this)"><span class="bn-ico">${m.icon}</span>${m.name}</a>`;
+  }).join('');
+
+  // Insertar antes de #bn-more
+  const bnMore = document.getElementById('bn-more');
+  bnMore.insertAdjacentHTML('beforebegin', html);
+
+  // "Más" visible solo si hay items que no caben
+  const hasOverflow = overflowItems.some(k => {
+    if (STATIC_NAV[k]) return true;
+    const mid = parseInt(k.replace('custom-',''));
+    const m = customMenus.find(x=>x.id===mid);
+    return m && canAccess(m.access);
+  });
+  bnMore.style.display = hasOverflow ? '' : 'none';
+
+  buildMoreDrawer();
 }
 
 function buildSidebarNav() {
@@ -3680,13 +3706,22 @@ function buildCustomMenuViews() {
 function buildMoreDrawer() {
   const drawer = document.getElementById('more-drawer');
   const hidden = (currentUser && currentUser.role !== 'admin') ? (currentUser.hiddenMenus || []) : [];
-  const orderedCustom = navOrder
-    .filter(k => k.startsWith('custom-') && !hidden.includes(k))
-    .map(k => customMenus.find(m => m.id === parseInt(k.replace('custom-',''))))
-    .filter(m => m && canAccess(m.access));
-  drawer.innerHTML = orderedCustom.map(m=>`
-    <a data-view="view-custom-${m.id}" onclick="checkPinAndSwitch(${m.id},this)">${m.icon} ${m.name}</a>
-  `).join('') || '<div style="color:var(--text2);font-size:.82rem;padding:8px">Sin menús personalizados</div>';
+  const allKeys = ['dashboard','deudas','home','balance',...customMenus.map(m=>'custom-'+m.id)];
+  const orderedVisible = navOrder.filter(k => allKeys.includes(k) && !hidden.includes(k));
+  const overflowKeys = orderedVisible.slice(3); // items que no caben en bottom nav
+
+  const html = overflowKeys.map(key => {
+    if (STATIC_NAV[key]) {
+      const {ico, label, view} = STATIC_NAV[key];
+      return `<a data-view="${view}" onclick="switchView(this)">${ico} ${label}</a>`;
+    }
+    const mid = parseInt(key.replace('custom-',''));
+    const m = customMenus.find(x=>x.id===mid);
+    if (!m || !canAccess(m.access)) return '';
+    return `<a data-view="view-custom-${m.id}" onclick="checkPinAndSwitch(${m.id},this)">${m.icon} ${m.name}</a>`;
+  }).join('');
+
+  drawer.innerHTML = html || '<div style="color:var(--text2);font-size:.82rem;padding:8px">Sin más menús</div>';
 }
 
 function toggleMoreDrawer() {
