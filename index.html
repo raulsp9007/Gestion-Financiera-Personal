@@ -1292,6 +1292,15 @@
       <label>Notas</label>
       <textarea id="home-tx-notes" placeholder="Notas adicionales..."></textarea>
     </div>
+    <div class="form-row">
+      <label>Recurrencia</label>
+      <select id="home-tx-recurring-sel">
+        <option value="">Sin recurrencia</option>
+        <option value="semanal">🔄 Semanal</option>
+        <option value="mensual">🔄 Mensual</option>
+        <option value="anual">🔄 Anual</option>
+      </select>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="home-del-btn" onclick="deleteHomeTx()" style="margin-right:auto;display:none">🗑 Eliminar</button>
       <button class="btn btn-ghost" onclick="closeHomeTxModal()">Cancelar</button>
@@ -2825,6 +2834,7 @@ function openHomeTxModal(id) {
   document.getElementById('home-tx-desc').value = '';
   document.getElementById('home-tx-type').value = 'expense';
   document.getElementById('home-tx-notes').value = '';
+  document.getElementById('home-tx-recurring-sel').value = '';
   // 2. Edición: sobrescribir con datos reales
   if (id) {
     const t = homeTxs.find(x=>x.id===id);
@@ -2836,6 +2846,7 @@ function openHomeTxModal(id) {
     document.getElementById('home-tx-desc').value = t.description;
     document.getElementById('home-tx-type').value = t.type;
     document.getElementById('home-tx-notes').value = t.notes || '';
+    document.getElementById('home-tx-recurring-sel').value = t.recurring || '';
     del.style.display = 'inline-flex';
   } else {
     document.getElementById('home-modal-title').textContent = '🏠 Nueva entrada hogar';
@@ -2861,23 +2872,31 @@ function saveHomeTx() {
   // Si el modal está siendo usado por un custom menu, delegar
   if (activeCustomMenuId !== null) { saveCustomTx(activeCustomMenuId); return; }
 
-  const id     = document.getElementById('home-tx-id').value;
-  const date   = document.getElementById('home-tx-date').value;
-  const amount = parseFloat(document.getElementById('home-tx-amount').value);
-  const desc   = document.getElementById('home-tx-desc').value.trim();
-  const type   = document.getElementById('home-tx-type').value;
-  const cat    = document.getElementById('home-tx-cat').value;
-  const notes  = document.getElementById('home-tx-notes').value.trim();
+  const id        = document.getElementById('home-tx-id').value;
+  const date      = document.getElementById('home-tx-date').value;
+  const amount    = parseFloat(document.getElementById('home-tx-amount').value);
+  const desc      = document.getElementById('home-tx-desc').value.trim();
+  const type      = document.getElementById('home-tx-type').value;
+  const cat       = document.getElementById('home-tx-cat').value;
+  const notes     = document.getElementById('home-tx-notes').value.trim();
+  const recurring = document.getElementById('home-tx-recurring-sel').value || false;
 
   if (!date || isNaN(amount) || amount <= 0 || !desc) {
     alert('Por favor completa fecha, monto y descripción.');
     return;
   }
+  const recurringNext = recurring ? nextOccurrence(date, recurring) : undefined;
   if (id) {
     const idx = homeTxs.findIndex(t=>t.id===parseInt(id));
-    if (idx >= 0) homeTxs[idx] = { ...homeTxs[idx], date, amount, description:desc, type, category:cat, notes };
+    if (idx >= 0) {
+      homeTxs[idx] = { ...homeTxs[idx], date, amount, description:desc, type, category:cat, notes, recurring };
+      if (recurring) homeTxs[idx].recurringNext = recurringNext;
+      else delete homeTxs[idx].recurringNext;
+    }
   } else {
-    homeTxs.push({ id:nextHomeId++, date, amount, description:desc, type, category:cat, notes });
+    const tx = { id:nextHomeId++, date, amount, description:desc, type, category:cat, notes, recurring };
+    if (recurring) tx.recurringNext = recurringNext;
+    homeTxs.push(tx);
   }
 
   // Guardar color de categoría si es gasto
@@ -3813,6 +3832,7 @@ function openCustomTxModal(menuId, txId) {
   document.getElementById('home-tx-desc').value = '';
   document.getElementById('home-tx-type').value = 'expense';
   document.getElementById('home-tx-notes').value = '';
+  document.getElementById('home-tx-recurring-sel').value = '';
   // 2. Edición: sobrescribir con datos reales
   if (txId) {
     const t = m.data.find(x=>x.id===txId);
@@ -3824,6 +3844,7 @@ function openCustomTxModal(menuId, txId) {
     document.getElementById('home-tx-desc').value = t.description;
     document.getElementById('home-tx-type').value = t.type;
     document.getElementById('home-tx-notes').value = t.notes || '';
+    document.getElementById('home-tx-recurring-sel').value = t.recurring || '';
     del.style.display = 'inline-flex';
     del.onclick = () => deleteCustomTx(menuId, t.id);
   } else {
@@ -3845,21 +3866,29 @@ function openCustomTxModal(menuId, txId) {
 function saveCustomTx(menuId) {
   const m = customMenus.find(x=>x.id===menuId);
   if (!m) return;
-  const id     = document.getElementById('home-tx-id').value;
-  const date   = document.getElementById('home-tx-date').value;
-  const amount = parseFloat(document.getElementById('home-tx-amount').value);
-  const desc   = document.getElementById('home-tx-desc').value.trim();
-  const type   = document.getElementById('home-tx-type').value;
-  const cat    = document.getElementById('home-tx-cat').value;
-  const notes  = document.getElementById('home-tx-notes').value.trim();
+  const id        = document.getElementById('home-tx-id').value;
+  const date      = document.getElementById('home-tx-date').value;
+  const amount    = parseFloat(document.getElementById('home-tx-amount').value);
+  const desc      = document.getElementById('home-tx-desc').value.trim();
+  const type      = document.getElementById('home-tx-type').value;
+  const cat       = document.getElementById('home-tx-cat').value;
+  const notes     = document.getElementById('home-tx-notes').value.trim();
+  const recurring = document.getElementById('home-tx-recurring-sel').value || false;
   if (!date || isNaN(amount) || amount<=0 || !desc) { alert('Completa fecha, monto y descripción.'); return; }
   if (!m.data) m.data = [];
   if (!m.nextDataId) m.nextDataId = 1;
+  const recurringNext = recurring ? nextOccurrence(date, recurring) : undefined;
   if (id) {
     const idx = m.data.findIndex(t=>t.id===parseInt(id));
-    if (idx>=0) m.data[idx]={...m.data[idx],date,amount,description:desc,type,category:cat,notes};
+    if (idx>=0) {
+      m.data[idx]={...m.data[idx],date,amount,description:desc,type,category:cat,notes,recurring};
+      if (recurring) m.data[idx].recurringNext = recurringNext;
+      else delete m.data[idx].recurringNext;
+    }
   } else {
-    m.data.push({id:m.nextDataId++,date,amount,description:desc,type,category:cat,notes});
+    const tx={id:m.nextDataId++,date,amount,description:desc,type,category:cat,notes,recurring};
+    if (recurring) tx.recurringNext = recurringNext;
+    m.data.push(tx);
   }
   activeCustomMenuId = null;
   closeHomeTxModal();
@@ -5026,6 +5055,8 @@ function nextOccurrence(dateStr, period) {
 function processRecurringAuto() {
   const today = new Date().toISOString().split('T')[0];
   let changed = false;
+
+  // txs principales
   txs.filter(t => t.recurring && t.recurringNext).forEach(t => {
     while (t.recurringNext && t.recurringNext <= today) {
       const {recurringNext, ...base} = t;
@@ -5034,6 +5065,31 @@ function processRecurringAuto() {
       changed = true;
     }
   });
+
+  // homeTxs
+  homeTxs.filter(t => t.recurring && t.recurringNext).forEach(t => {
+    while (t.recurringNext && t.recurringNext <= today) {
+      const {recurringNext, ...base} = t;
+      homeTxs.push({...base, id: nextHomeId++, date: recurringNext});
+      t.recurringNext = nextOccurrence(recurringNext, t.recurring);
+      changed = true;
+    }
+  });
+
+  // custom menus
+  customMenus.forEach(m => {
+    if (!m.data) return;
+    m.data.filter(t => t.recurring && t.recurringNext).forEach(t => {
+      while (t.recurringNext && t.recurringNext <= today) {
+        const {recurringNext, ...base} = t;
+        if (!m.nextDataId) m.nextDataId = (m.data.reduce((mx,x)=>Math.max(mx,x.id),0) + 1);
+        m.data.push({...base, id: m.nextDataId++, date: recurringNext});
+        t.recurringNext = nextOccurrence(recurringNext, t.recurring);
+        changed = true;
+      }
+    });
+  });
+
   if (changed) { renderAll(); scheduleSave(); showToast('🔄 Transacciones recurrentes generadas automáticamente'); }
 }
 
