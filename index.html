@@ -1756,6 +1756,7 @@ const COL_DEFS = {
     amount:      { label: 'Monto',       fn: (t,curr) => `<td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${curr}${t.amount.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})}${recBadge(t)}</td>` },
     description: { label: 'Descripción', fn: (t,curr) => `<td>${t.description}</td>` },
     type:        { label: 'Tipo',        fn: (t,curr) => `<td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>` },
+    category:    { label: 'Categoría',   fn: (t,curr) => `<td>${renderCatDot(t.category)}<span class="home-cat-badge">${catLabel(t.category)}</span></td>` },
     notes:       { label: 'Notas',       fn: (t,curr) => `<td>${renderNote(t.notes)}</td>` },
   },
 };
@@ -1764,7 +1765,7 @@ const COL_DEFAULTS = {
   history: ['date','amount','description','type','category','notes'],
   deudas:  ['date','persona','description','type','total','progress','status'],
   home:    ['date','amount','description','type','category','notes'],
-  custom:  ['date','amount','description','type','notes'],
+  custom:  ['date','amount','description','type','category','notes'],
 };
 
 function getColConfig(tableId) {
@@ -2058,7 +2059,14 @@ function applyRemoteData(data) {
     if (c.globalCats) { globalCats = c.globalCats; rebuildLegacyCatMaps(); }
     if (c.homeCurr) HOME_CURR = c.homeCurr;
     if (c.navOrder && Array.isArray(c.navOrder)) navOrder = c.navOrder;
-    if (c.customMenus) { customMenus = c.customMenus; buildCustomMenuViews(); renderNavForUser(); }
+    if (c.customMenus) {
+      customMenus = c.customMenus;
+      buildCustomMenuViews();
+      // Restaurar vista activa — buildCustomMenuViews destruye el DOM de custom views
+      const activeEl = document.getElementById(currentView);
+      if (activeEl) activeEl.classList.add('active');
+      renderNavForUser();
+    }
     if (c.budgets) budgets = c.budgets;
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
   }
@@ -2395,12 +2403,17 @@ function renderDashCustomMenus() {
   });
 }
 
-function openCatColorsModal(source) {
+function openCatColorsModal(source, menuId) {
   _catModalSource = source || 'main';
-  const isHome = _catModalSource === 'home';
-  const dataset   = isHome ? homeTxs : txs;
-  const colorMap  = isHome ? homeCatColors : catColors;
-  const labelFn   = isHome ? homeCatLabel : catLabel;
+  const isHome   = _catModalSource === 'home';
+  const isCustom = _catModalSource === 'custom';
+  let dataset;
+  if (isHome) dataset = homeTxs;
+  else if (isCustom && menuId) {
+    const _cm = customMenus.find(x => x.id === menuId);
+    dataset = _cm ? (_cm.data || []) : txs;
+  } else dataset = txs;
+  const labelFn = catLabel;
 
   const cats = {};
   dataset.filter(t=>t.type==='expense').forEach(t=>{
@@ -3783,7 +3796,7 @@ function buildCustomMenuViews() {
       <div class="cards" id="cm-cards-${m.id}"></div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos</h3><canvas id="cm-chart-monthly-${m.id}"></canvas></div>
-        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal()" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="cm-chart-cat-${m.id}"></canvas></div>
+        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal('custom',${m.id})" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="cm-chart-cat-${m.id}"></canvas></div>
       </div>
       <button class="filter-toggle-btn" onclick="toggleFilters('cmf-filters-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-month-${m.id}')">
         🔍 Buscar y filtrar
