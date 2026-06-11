@@ -2409,7 +2409,7 @@ function openCatColorsModal(source) {
   const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
   const rows = sorted.map(([key, amt], i) => {
-    const color    = colorMap[key] || DEFAULT_CAT_COLORS[i % DEFAULT_CAT_COLORS.length];
+    const color    = getCatColor(key, i);  // lee globalCats primero, luego catColors, luego default
     const label    = labelFn(key);
     const defColor = DEFAULT_CAT_COLORS[i % DEFAULT_CAT_COLORS.length];
     return `
