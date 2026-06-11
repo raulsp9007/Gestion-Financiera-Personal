@@ -3643,6 +3643,7 @@ function updateFilterCount(countId, ...inputIds) {
 // HOME BILLINGS — SUBMENU MENSUAL
 // ============================================================
 let homeCurrentMonth = null; // null = vista general
+let customMenuCurrentMonth = {}; // {menuId: null|'MM'}, null = todos
 
 function renderHomeMonthTabs() {
   const months = [...new Set(homeTxs.map(t => t.date.substring(5,7)))].sort();
@@ -3661,6 +3662,27 @@ function selectHomeMonth(m) {
   const sel = document.getElementById('hf-month');
   if (sel) sel.value = m || '';
   renderHome();
+}
+
+function renderCmMonthTabs(menuId) {
+  const m = customMenus.find(x=>x.id===menuId);
+  if (!m) return;
+  const months = [...new Set((m.data||[]).map(t=>t.date.substring(5,7)))].sort();
+  const wrap = document.getElementById('cm-month-tabs-'+menuId);
+  if (!wrap) return;
+  const cur = customMenuCurrentMonth[menuId] ?? null;
+  wrap.innerHTML =
+    `<button class="month-tab ${cur===null?'active':''}" onclick="selectCmMonth(${menuId},null)">Todos</button>` +
+    months.map(mo =>
+      `<button class="month-tab ${mo===cur?'active':''}" onclick="selectCmMonth(${menuId},'${mo}')">${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(mo)-1]}</button>`
+    ).join('');
+}
+
+function selectCmMonth(menuId, mo) {
+  customMenuCurrentMonth[menuId] = mo;
+  const sel = document.getElementById('cmf-month-'+menuId);
+  if (sel) sel.value = mo || '';
+  renderCustomMenuView(menuId);
 }
 
 function showToast(msg, color) {
@@ -3909,22 +3931,26 @@ function buildCustomMenuViews() {
     div.id = 'view-custom-' + m.id;
     div.className = 'view';
     div.innerHTML = `
+      <div class="month-tabs" id="cm-month-tabs-${m.id}" style="margin-bottom:14px"></div>
       <div class="cards" id="cm-cards-${m.id}"></div>
       <div class="charts">
         <div class="chart-box"><h3>Ingresos vs Gastos</h3><canvas id="cm-chart-monthly-${m.id}"></canvas></div>
         <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal('custom',${m.id})" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="cm-chart-cat-${m.id}"></canvas></div>
       </div>
-      <button class="filter-toggle-btn" onclick="toggleFilters('cmf-filters-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-month-${m.id}')">
+      <button class="filter-toggle-btn" onclick="toggleFilters('cmf-filters-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}')">
         🔍 Buscar y filtrar
         <span class="ft-count" id="cmf-filter-count-${m.id}"></span>
         <span style="margin-left:auto;font-size:.8rem" id="cmf-filter-arrow-${m.id}">▾</span>
       </button>
       <div class="filters" id="cmf-filters-${m.id}">
-        <input type="text" id="cmf-search-${m.id}" placeholder="🔍 Buscar..." oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-month-${m.id}')">
-        <select id="cmf-type-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-month-${m.id}')">
+        <input type="text" id="cmf-search-${m.id}" placeholder="🔍 Buscar..." oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}')">
+        <select id="cmf-type-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}')">
           <option value="">Todos</option><option value="income">Ingresos</option><option value="expense">Gastos</option>
         </select>
-        <select id="cmf-month-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-month-${m.id}')">
+        <select id="cmf-cat-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}')">
+          <option value="">Todas las categorías</option>
+        </select>
+        <select id="cmf-month-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}')">
           <option value="">Todos los meses</option>
           ${['01','02','03','04','05','06','07','08','09','10','11','12'].map(mo=>`<option value="${mo}">${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(mo)-1]}</option>`).join('')}
         </select>
@@ -4039,28 +4065,55 @@ function renderCustomMenuView(menuId) {
   if (!m) return;
   const data = m.data || [];
   const curr = m.currency + ' ';
+  const fmt = v => curr + v.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
 
-  const inc = data.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-  const exp = data.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  // Month tabs
+  renderCmMonthTabs(menuId);
+
+  // Active month (null = todos)
+  const curMM = customMenuCurrentMonth[menuId] ?? null;
+  if (curMM) {
+    const selMes = document.getElementById('cmf-month-'+menuId);
+    if (selMes && selMes.value !== curMM) selMes.value = curMM;
+  }
+
+  // Populate category filter options
+  const catSel = document.getElementById('cmf-cat-'+menuId);
+  if (catSel) {
+    const prevCat = catSel.value;
+    catSel.innerHTML = '<option value="">Todas las categorías</option>'
+      + Object.entries(globalCats.inc).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')
+      + Object.entries(globalCats.exp).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+    if (prevCat) catSel.value = prevCat;
+  }
+
+  // Base list for cards (filtered by active month tab)
+  const baseList = curMM ? data.filter(t=>t.date.substring(5,7)===curMM) : data;
+
+  const inc = baseList.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const exp = baseList.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   const net = inc - exp;
 
-  // % change vs previous month (B)
-  const now = new Date();
-  const curMo = String(now.getMonth()+1).padStart(2,'0');
-  const prevMo = now.getMonth()===0 ? '12' : String(now.getMonth()).padStart(2,'0');
-  const curMoData  = data.filter(t=>t.date.substring(5,7)===curMo);
-  const prevMoData = data.filter(t=>t.date.substring(5,7)===prevMo);
-  const cInc = curMoData.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-  const cExp = curMoData.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-  const pInc = prevMoData.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-  const pExp = prevMoData.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-  document.getElementById('cm-cards-'+menuId).innerHTML = `
-    <div class="card green"><div class="label">Ingresos</div><div class="value">${curr}${inc.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>${renderPctBadge(cInc,pInc)}</div>
-    <div class="card red"><div class="label">Gastos</div><div class="value">${curr}${exp.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>${renderPctBadge(cExp,pExp,true)}</div>
-    <div class="card ${net>=0?'blue':'red'}"><div class="label">Balance</div><div class="value" style="font-size:1.35rem">${net>=0?'+':''}${curr}${Math.abs(net).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
-    <div class="card purple"><div class="label">Registros</div><div class="value" style="font-size:1.6rem">${data.length}</div><div class="sub">vs mes ant.</div></div>`;
+  const periodLabel = curMM
+    ? ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][parseInt(curMM)-1]
+    : 'Todo el período';
 
-  // Chart monthly
+  let prevInc=0, prevExp=0;
+  if (curMM) {
+    const mm = parseInt(curMM);
+    const prevM = mm===1 ? '12' : String(mm-1).padStart(2,'0');
+    const prevList = data.filter(t=>t.date.substring(5,7)===prevM);
+    prevInc = prevList.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+    prevExp = prevList.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  }
+
+  document.getElementById('cm-cards-'+menuId).innerHTML = `
+    <div class="card green"><div class="label">Ingresos</div><div class="value">${fmt(inc)}</div>${curMM?renderPctBadge(inc,prevInc):'<div class="sub">'+periodLabel+'</div>'}</div>
+    <div class="card red"><div class="label">Gastos</div><div class="value">${fmt(exp)}</div>${curMM?renderPctBadge(exp,prevExp,true):'<div class="sub">'+periodLabel+'</div>'}</div>
+    <div class="card ${net>=0?'blue':'red'}"><div class="label">Balance</div><div class="value" style="font-size:1.35rem">${net>=0?'+':''}${fmt(Math.abs(net))}</div><div class="sub">${periodLabel}</div></div>
+    <div class="card purple"><div class="label">Registros</div><div class="value" style="font-size:1.6rem">${baseList.length}</div><div class="sub">de ${data.length} total</div></div>`;
+
+  // Chart monthly — siempre sobre todos los meses para ver tendencia completa
   const months = [...new Set(data.map(t=>t.date.substring(5,7)))].sort();
   const mIncs = months.map(mo=>data.filter(t=>t.date.substring(5,7)===mo&&t.type==='income').reduce((s,t)=>s+t.amount,0));
   const mExps = months.map(mo=>data.filter(t=>t.date.substring(5,7)===mo&&t.type==='expense').reduce((s,t)=>s+t.amount,0));
@@ -4079,9 +4132,11 @@ function renderCustomMenuView(menuId) {
   let list = [...data];
   const s=(document.getElementById('cmf-search-'+menuId).value||'').toLowerCase();
   const tp=document.getElementById('cmf-type-'+menuId).value;
+  const cat=(document.getElementById('cmf-cat-'+menuId)?.value||'');
   const mm=document.getElementById('cmf-month-'+menuId).value;
   if (s) list=list.filter(t=>t.description.toLowerCase().includes(s));
   if (tp) list=list.filter(t=>t.type===tp);
+  if (cat) list=list.filter(t=>t.category===cat);
   if (mm) list=list.filter(t=>t.date.substring(5,7)===mm);
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
