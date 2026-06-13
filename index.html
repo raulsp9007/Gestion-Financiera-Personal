@@ -4793,7 +4793,8 @@ function currentCatObj() {
 
 function renderCatsList() {
   const obj = currentCatObj();
-  const entries = Object.entries(obj).sort((a,b) => a[1].label.localeCompare(b[1].label, 'es'));
+  const _stripEmoji = s => s.replace(/^\P{L}+/u, '');
+  const entries = Object.entries(obj).sort((a,b) => _stripEmoji(a[1].label).localeCompare(_stripEmoji(b[1].label), 'es'));
   const wrap = document.getElementById('cats-list');
   if (!entries.length) {
     wrap.innerHTML = '<div style="color:var(--text2);font-size:.82rem;padding:10px">Sin categorías. Agrega una abajo.</div>';
