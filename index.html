@@ -823,6 +823,16 @@
 
   /* 5: Recurring indicator */
   .rec-badge{display:inline-flex;align-items:center;gap:3px;font-size:.65rem;padding:1px 6px;border-radius:99px;background:rgba(139,92,246,.15);color:#a78bfa;font-weight:600;margin-left:4px}
+
+  /* 6: External donut chart tooltip */
+  .chart-tooltip-ext{position:fixed;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;pointer-events:none;z-index:9999;max-width:260px;min-width:150px;font-size:.78rem;color:var(--text);box-shadow:0 4px 24px rgba(0,0,0,.5);opacity:0;transition:opacity .12s}
+  .ctt-title{font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap}
+  .ctt-total{color:var(--acc);margin-left:auto;white-space:nowrap}
+  .ctt-row{display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.74rem}
+  .ctt-row:last-child{border-bottom:none}
+  .ctt-desc{color:var(--text2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ctt-amt{font-weight:600;white-space:nowrap;color:var(--red)}
+  .ctt-more{color:var(--text2);font-size:.71rem;margin-top:5px;text-align:center}
 </style>
 </head>
 <body>
@@ -2460,6 +2470,10 @@ function renderDashCustomMenus() {
     sources.forEach(({id, data}) => {
       if (!data.length) return;
 
+      const _srcM = customMenus.find(x=>'cm_'+x.id===id);
+      const _dcmFmt = id==='home' ? fmtH : (v=>(_srcM?.currency||'$')+v.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2}));
+      const _dcmLegend = {responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:9},padding:6,boxWidth:10}}}};
+
       const incCats = {}, expCats = {};
       data.forEach(t => {
         if (t.type==='income') incCats[t.category] = (incCats[t.category]||0) + t.amount;
@@ -2472,20 +2486,22 @@ function renderDashCustomMenus() {
       const ctxExp = document.getElementById('dcm-chart-exp-'+id);
 
       if (ctxInc && incEntries.length) {
+        const _incKeys = incEntries.map(([k])=>k);
         _cmDashCharts['inc_'+id] = new Chart(ctxInc.getContext('2d'), {
           type:'doughnut',
           data:{ labels: incEntries.map(([k])=>catLabel(k)), datasets:[{ data: incEntries.map(([,v])=>v), backgroundColor: incEntries.map(([k],i)=>getCatColor(k,i)), borderWidth:2, borderColor:'#1e293b' }] },
-          options: PIE_OPTS()
+          options:{..._dcmLegend,plugins:{..._dcmLegend.plugins,tooltip:{enabled:false,external:makeCatTooltipHandler(_incKeys,data,_dcmFmt)}}}
         });
       } else if (ctxInc) {
         ctxInc.closest('.dcm-chart-wrap').innerHTML += '<div class="dcm-empty" style="margin-top:-6px">Sin ingresos</div>';
       }
 
       if (ctxExp && expEntries.length) {
+        const _expKeys = expEntries.map(([k])=>k);
         _cmDashCharts['exp_'+id] = new Chart(ctxExp.getContext('2d'), {
           type:'doughnut',
           data:{ labels: expEntries.map(([k])=>catLabel(k)), datasets:[{ data: expEntries.map(([,v])=>v), backgroundColor: expEntries.map(([k],i)=>getCatColor(k,i)), borderWidth:2, borderColor:'#1e293b' }] },
-          options: PIE_OPTS()
+          options:{..._dcmLegend,plugins:{..._dcmLegend.plugins,tooltip:{enabled:false,external:makeCatTooltipHandler(_expKeys,data,_dcmFmt)}}}
         });
       } else if (ctxExp) {
         ctxExp.closest('.dcm-chart-wrap').innerHTML += '<div class="dcm-empty" style="margin-top:-6px">Sin gastos</div>';
@@ -3039,12 +3055,13 @@ function renderHome() {
   homeTxs.filter(t=>t.type==='expense').forEach(t=>{ cats[t.category]=(cats[t.category]||0)+t.amount; });
   const sorted = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,9);
   const colors = sorted.map(([key], i) => getHomeCatColor(key, i));
+  const _hCatKeys = sorted.map(([k])=>k);
   const ctx2 = document.getElementById('chart-home-cat').getContext('2d');
   if (chartHomeCat) chartHomeCat.destroy();
   chartHomeCat = new Chart(ctx2, {
     type:'doughnut',
     data:{labels:sorted.map(([c])=>homeCatLabel(c)), datasets:[{data:sorted.map(([,v])=>v), backgroundColor:colors, borderWidth:2, borderColor:'#1e293b'}]},
-    options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}}}}
+    options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}},tooltip:{enabled:false,external:makeCatTooltipHandler(_hCatKeys,homeTxs,fmtH)}}}
   });
 
   chartHomeWeekly = renderWeeklyChart(baseList, 'chart-home-weekly', chartHomeWeekly);
@@ -4173,7 +4190,9 @@ function renderCustomMenuView(menuId) {
   const colors=sorted.map(([key],i)=>getCatColor(key,i));
   const ctx2=document.getElementById('cm-chart-cat-'+menuId).getContext('2d');
   if (customCharts[menuId].cat) customCharts[menuId].cat.destroy();
-  customCharts[menuId].cat=new Chart(ctx2,{type:'doughnut',data:{labels:sorted.map(([c])=>catLabel(c)),datasets:[{data:sorted.map(([,v])=>v),backgroundColor:colors,borderWidth:2,borderColor:'#1e293b'}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}}}}});
+  const _cmCatKeys=sorted.map(([k])=>k);
+  const _cmFmtFn=(v=>(m.currency||'$')+v.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2}));
+  customCharts[menuId].cat=new Chart(ctx2,{type:'doughnut',data:{labels:sorted.map(([c])=>catLabel(c)),datasets:[{data:sorted.map(([,v])=>v),backgroundColor:colors,borderWidth:2,borderColor:'#1e293b'}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:10},padding:8}},tooltip:{enabled:false,external:makeCatTooltipHandler(_cmCatKeys,data,_cmFmtFn)}}}});
 
   customCharts[menuId].weekly = renderWeeklyChart(baseList, 'cm-chart-weekly-'+menuId, customCharts[menuId].weekly);
 
@@ -5300,6 +5319,47 @@ function renderCmpDelta(cur, prev, prevMM, inv) {
   const dir = d > 0 ? 'up' : 'down';
   const arrow = d > 0 ? '↑' : '↓';
   return `<div class="cmp-delta ${dir}${inv?' inv':''}">${arrow} ${pct}% vs ${monthName(prevMM)}</div>`;
+}
+
+function makeCatTooltipHandler(catKeys, txList, fmtFn) {
+  return function(context) {
+    const { chart, tooltip } = context;
+    let el = document.getElementById('chart-ext-tooltip');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'chart-ext-tooltip';
+      el.className = 'chart-tooltip-ext';
+      document.body.appendChild(el);
+    }
+    if (tooltip.opacity === 0) { el.style.opacity = '0'; return; }
+    const dp = tooltip.dataPoints[0];
+    const idx = dp.dataIndex;
+    const key = catKeys[idx];
+    const total = dp.raw;
+    const bgColors = dp.dataset.backgroundColor;
+    const color = Array.isArray(bgColors) ? bgColors[idx] : '#888';
+    const label = dp.label;
+    const relTxs = (txList || [])
+      .filter(t => t.category === key)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const show = relTxs.slice(0, 9);
+    const rows = show.map(t =>
+      `<div class="ctt-row"><span class="ctt-desc">${t.date.substring(5)} · ${t.description}</span><span class="ctt-amt">${fmtFn(t.amount)}</span></div>`
+    ).join('');
+    const more = relTxs.length > 9 ? `<div class="ctt-more">+${relTxs.length - 9} más...</div>` : '';
+    el.innerHTML = `<div class="ctt-title"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0"></span>${label}<span class="ctt-total">${fmtFn(total)}</span></div>${rows}${more}`;
+    el.style.opacity = '1';
+    const pos = chart.canvas.getBoundingClientRect();
+    let x = pos.left + tooltip.caretX + 14;
+    let y = pos.top + tooltip.caretY - 10;
+    const elW = 264;
+    const elH = el.offsetHeight || 180;
+    if (x + elW > window.innerWidth - 8) x = pos.left + tooltip.caretX - elW - 10;
+    if (y + elH > window.innerHeight - 8) y = window.innerHeight - elH - 12;
+    if (y < 8) y = 8;
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+  };
 }
 
 // ============================================================
