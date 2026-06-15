@@ -1918,6 +1918,7 @@ let deferredInstallPrompt = null;
 let pendingOfflineChanges = false;
 let _pollTimer = null;
 let _pendingLocalChanges = false;
+let deletedIds = []; // tombstone para merge concurrente
 let _applyingRemote = false;
 let _renderPending = false;
 // BroadcastChannel: sync instantáneo entre pestañas del mismo navegador
@@ -2007,6 +2008,7 @@ function initFromDrive(data) {
     if (c.forceReloadTs) forceReloadTs = c.forceReloadTs;
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
   }
+  if (data && data.deletedIds) deletedIds = [...new Set([...deletedIds, ...data.deletedIds])];
   if (data && data.lastUpdated) lastUpdatedStr = data.lastUpdated;
   // Señal de recarga forzada por admin
   const _ackReload = parseInt(localStorage.getItem('cashmap_force_reload_ack') || '0');
@@ -2048,6 +2050,30 @@ function scheduleSave() {
   saveTimeout = setTimeout(pushToDrive, SAVE_DELAY);
 }
 
+function mergeData(local, remote) {
+  if (!remote || remote.error || !remote.transactions) return local;
+  const allDel = new Set([...(local.deletedIds||[]), ...(remote.deletedIds||[])]);
+  const mergeArr = (loc, rem) => {
+    const map = {};
+    (rem||[]).forEach(t => { if (!allDel.has(t.id)) map[t.id] = t; });
+    (loc||[]).forEach(t => { if (!allDel.has(t.id)) map[t.id] = t; }); // local gana mismo id
+    return Object.values(map);
+  };
+  const mergedMenus = (remote.config?.customMenus||[]).map(rm => {
+    const lm = (local.config?.customMenus||[]).find(x => x.id === rm.id);
+    return { ...rm, data: mergeArr(lm?.data||[], rm.data||[]) };
+  });
+  return {
+    ...remote,
+    transactions: mergeArr(local.transactions, remote.transactions),
+    deudas:       mergeArr(local.deudas,       remote.deudas),
+    home:         mergeArr(local.home,          remote.home),
+    config:       { ...remote.config, customMenus: mergedMenus },
+    deletedIds:   [...allDel],
+    lastUpdated:  new Date().toISOString()
+  };
+}
+
 function pushToDrive() {
   // Serializar customMenus sin las instancias de Chart
   const menusPayload = customMenus.map(m => { const {charts,...rest}=m; return rest; });
@@ -2059,7 +2085,8 @@ function pushToDrive() {
       colConfig: JSON.parse(localStorage.getItem('cashmap_col_config') || '{}'),
       forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder
     },
-    transactions:txs, deudas:deudas, home:homeTxs
+    transactions:txs, deudas:deudas, home:homeTxs,
+    deletedIds: [...new Set(deletedIds)]
   };
 
   // Siempre guardar en localStorage (offline backup)
@@ -2078,49 +2105,54 @@ function pushToDrive() {
   setSyncBadge('saving');
   pendingOfflineChanges = false;
 
+  const _doSave = (merged) => {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(merged)); localStorage.setItem(CACHE_TS_KEY, Date.now().toString()); } catch(e) {}
+    if (inAppsScript) {
+      google.script.run
+        .withSuccessHandler(r => {
+          if (r && r.ok) {
+            setSyncBadge('ok', '✅ Guardado en Drive (' + r.count + ')');
+            lastUpdatedStr = merged.lastUpdated;
+            _lastOwnSaveTs = Date.now();
+            _pendingLocalChanges = false;
+            if (_bc) _bc.postMessage({type:'DATA_CHANGED', updatedAt:merged.lastUpdated, payload:merged});
+          } else setSyncBadge('error');
+        })
+        .withFailureHandler(() => { pendingOfflineChanges = true; setSyncBadge('error'); })
+        .saveData(merged);
+    } else {
+      fetch(getApiUrl(), {method:'POST', headers:{'Content-Type':'text/plain;charset=UTF-8'}, body:JSON.stringify(merged)})
+        .then(r => r.text())
+        .then(text => {
+          let r; try { r = JSON.parse(text); } catch(e) { console.error('[CashMap] Respuesta no-JSON:', text.slice(0,300)); setSyncBadge('error'); return; }
+          if (r && r.ok) {
+            setSyncBadge('ok', '✅ Guardado');
+            lastUpdatedStr = merged.lastUpdated;
+            _lastOwnSaveTs = Date.now();
+            _pendingLocalChanges = false;
+            if (_bc) _bc.postMessage({type:'DATA_CHANGED', updatedAt:merged.lastUpdated, payload:merged});
+          } else { console.error('[CashMap] Error del servidor:', r); setSyncBadge('error'); }
+        })
+        .catch(err => { console.error('[CashMap] Error de red al guardar:', err); pendingOfflineChanges = true; setSyncBadge('error'); });
+    }
+  };
+
   // Modo Apps Script
   if (inAppsScript) {
     google.script.run
-      .withSuccessHandler(r => {
-        if (r && r.ok) {
-          setSyncBadge('ok', '✅ Guardado en Drive (' + r.count + ')');
-          lastUpdatedStr = payload.lastUpdated;
-          _lastOwnSaveTs = Date.now();
-          _pendingLocalChanges = false;
-          if (_bc) _bc.postMessage({type:'DATA_CHANGED', updatedAt:payload.lastUpdated, payload});
-        } else setSyncBadge('error');
-      })
-      .withFailureHandler(() => { pendingOfflineChanges = true; setSyncBadge('error'); })
-      .saveData(payload);
+      .withSuccessHandler(remote => { _doSave(mergeData(payload, remote)); })
+      .withFailureHandler(() => { _doSave(payload); }) // sin remote → push directo
+      .loadData();
     return;
   }
 
   // Modo API externa (URL configurada en localStorage)
-  // Nota: usar text/plain evita el preflight CORS que GAS no maneja
   const _apiUrl = getApiUrl();
   if (_apiUrl) {
-    fetch(_apiUrl, {
-      method: 'POST',
-      headers: {'Content-Type':'text/plain;charset=UTF-8'},
-      body: JSON.stringify(payload)
-    })
-    .then(r => r.text())
-    .then(text => {
-      let r;
-      try { r = JSON.parse(text); } catch(e) {
-        console.error('[CashMap] Respuesta no-JSON del servidor:', text.slice(0, 300));
-        setSyncBadge('error');
-        return;
-      }
-      if (r && r.ok) {
-        setSyncBadge('ok', '✅ Guardado');
-        lastUpdatedStr = payload.lastUpdated;
-        _lastOwnSaveTs = Date.now();
-        _pendingLocalChanges = false;
-        if (_bc) _bc.postMessage({type:'DATA_CHANGED', updatedAt:payload.lastUpdated, payload});
-      } else { console.error('[CashMap] Error del servidor:', r); setSyncBadge('error'); }
-    })
-    .catch(err => { console.error('[CashMap] Error de red al guardar:', err); pendingOfflineChanges = true; setSyncBadge('error'); });
+    fetch(_apiUrl + '?action=load')
+      .then(r => r.json())
+      .then(remote => { _doSave(mergeData(payload, remote)); })
+      .catch(() => { _doSave(payload); }); // sin remote → push directo
     return;
   }
 
@@ -2880,6 +2912,7 @@ function deleteTx() {
   if (!editingId) return;
   const _id = editingId;
   showConfirm('¿Eliminar esta transacción? Esta acción no se puede deshacer.', ()=>{
+    deletedIds.push(_id);
     txs = txs.filter(t=>t.id!==_id);
     closeTxModal();
     renderAll();
@@ -3195,6 +3228,7 @@ function deleteHomeTx() {
   if (!editingHomeId) return;
   const _id = editingHomeId;
   showConfirm('¿Eliminar este registro del hogar?', ()=>{
+    deletedIds.push(_id);
     homeTxs = homeTxs.filter(t=>t.id!==_id);
     closeHomeTxModal();
     renderHome();
@@ -3351,6 +3385,7 @@ function deleteDeuda() {
   if (!editingDeudaId) return;
   const _id = editingDeudaId;
   showConfirm('¿Eliminar esta deuda y todos sus pagos? Esta acción no se puede deshacer.', ()=>{
+    deletedIds.push(_id);
     deudas = deudas.filter(d=>d.id!==_id);
     closeDeudaModal();
     renderDeudas();
@@ -4321,6 +4356,7 @@ function deleteCustomTx(menuId, txId) {
   const m = customMenus.find(x=>x.id===menuId);
   if (!m) return;
   showConfirm('¿Eliminar este registro?', ()=>{
+    deletedIds.push(txId);
     m.data = m.data.filter(t=>t.id!==txId);
     activeCustomMenuId = null;
     closeHomeTxModal();
