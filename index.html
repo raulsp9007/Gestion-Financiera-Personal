@@ -6110,6 +6110,7 @@ function handleAttachUpload(input) {
     const onOk = r => {
       _attachSetUploading(false);
       input.value = '';
+      alert('[DEBUG] r = ' + JSON.stringify(r));
       if (r && r.ok) {
         const att = { fileId: r.fileId, viewUrl: r.viewUrl, name: file.name, mimeType: file.type };
         _modalAttachments.push(att);
