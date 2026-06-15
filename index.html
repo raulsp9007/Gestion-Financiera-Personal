@@ -841,6 +841,10 @@
   .attach-del{background:none;border:none;cursor:pointer;color:var(--text2);font-size:.82rem;padding:0 1px;flex-shrink:0;line-height:1}
   .attach-badge{font-size:.67rem;background:rgba(139,92,246,.18);color:#a78bfa;border-radius:99px;padding:1px 5px;margin-left:4px;white-space:nowrap;vertical-align:middle}
   .attach-uploading{font-size:.72rem;color:var(--text2)}
+  .attach-thumb{width:52px;height:40px;object-fit:cover;border-radius:4px;cursor:zoom-in;border:1px solid var(--border);flex-shrink:0;transition:opacity .15s}
+  .attach-thumb:hover{opacity:.8}
+  .attach-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:10000;display:flex;align-items:center;justify-content:center;cursor:zoom-out}
+  .attach-lightbox img{max-width:92vw;max-height:88vh;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.6);pointer-events:none}
 
   /* 7: External donut chart tooltip */
   .chart-tooltip-ext{position:fixed;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;pointer-events:none;z-index:9999;max-width:260px;min-width:150px;font-size:.78rem;color:var(--text);box-shadow:0 4px 24px rgba(0,0,0,.5);opacity:0;transition:opacity .12s}
@@ -6090,9 +6094,21 @@ function renderAttachmentList() {
   if (!slot) return;
   const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   slot.innerHTML = _modalAttachments.map(a => {
-    const ico = (a.mimeType||'').startsWith('image') ? '🖼️' : '📄';
-    return `<div class="attach-item"><span>${ico}</span><a href="${a.viewUrl}" target="_blank" rel="noopener" title="${esc(a.name)}">${esc(a.name)}</a><button class="attach-del" onclick="removeAttachment('${esc(a.fileId)}')" title="Quitar">✕</button></div>`;
+    const isImg = (a.mimeType||'').startsWith('image');
+    const preview = isImg
+      ? `<img class="attach-thumb" src="https://drive.google.com/thumbnail?id=${a.fileId}&sz=w120" alt="${esc(a.name)}" data-fid="${a.fileId}" onclick="openAttachLightbox(this.dataset.fid)">`
+      : `<span>📄</span>`;
+    return `<div class="attach-item">${preview}<a href="${a.viewUrl}" target="_blank" rel="noopener" title="${esc(a.name)}">${esc(a.name)}</a><button class="attach-del" onclick="removeAttachment('${esc(a.fileId)}')" title="Quitar">✕</button></div>`;
   }).join('');
+}
+
+function openAttachLightbox(fileId) {
+  const lb = document.createElement('div');
+  lb.className = 'attach-lightbox';
+  lb.innerHTML = `<img src="https://lh3.googleusercontent.com/d/${fileId}" alt="adjunto">`;
+  lb.onclick = () => lb.remove();
+  document.addEventListener('keydown', function esc(e) { if(e.key==='Escape'){ lb.remove(); document.removeEventListener('keydown',esc); }});
+  document.body.appendChild(lb);
 }
 
 function handleAttachUpload(input) {
