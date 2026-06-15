@@ -833,6 +833,15 @@
   .presence-role-chip{font-size:.6rem;padding:1px 5px;border-radius:99px;background:var(--bg3);color:var(--text2)}
   .presence-ago{font-size:.65rem;color:var(--text2)}
 
+  /* 6: File attachments */
+  .attach-list-slot{display:flex;flex-wrap:wrap;gap:5px;min-height:2px;margin-bottom:4px}
+  .attach-item{display:inline-flex;align-items:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:.74rem;max-width:240px}
+  .attach-item a{color:var(--acc);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none;max-width:155px}
+  .attach-item a:hover{text-decoration:underline}
+  .attach-del{background:none;border:none;cursor:pointer;color:var(--text2);font-size:.82rem;padding:0 1px;flex-shrink:0;line-height:1}
+  .attach-badge{font-size:.67rem;background:rgba(139,92,246,.18);color:#a78bfa;border-radius:99px;padding:1px 5px;margin-left:4px;white-space:nowrap;vertical-align:middle}
+  .attach-uploading{font-size:.72rem;color:var(--text2)}
+
   /* 7: External donut chart tooltip */
   .chart-tooltip-ext{position:fixed;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;pointer-events:none;z-index:9999;max-width:260px;min-width:150px;font-size:.78rem;color:var(--text);box-shadow:0 4px 24px rgba(0,0,0,.5);opacity:0;transition:opacity .12s}
   .ctt-title{font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap}
@@ -1302,6 +1311,14 @@
         <option value="anual">🔄 Anual</option>
       </select>
     </div>
+    <div class="form-row">
+      <label>Adjuntos</label>
+      <div class="attach-list-slot"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button type="button" class="btn btn-ghost" onclick="triggerAttachUpload()" style="font-size:.78rem;padding:3px 10px;width:fit-content">📎 Adjuntar</button>
+        <span class="attach-uploading" id="tx-attach-uploading">⏳ Subiendo...</span>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="modal-del-btn" onclick="deleteTx()" style="margin-right:auto;display:none">🗑 Eliminar</button>
       <button class="btn btn-ghost" onclick="closeTxModal()">Cancelar</button>
@@ -1366,6 +1383,14 @@
       <button class="btn btn-ghost" id="home-del-btn" onclick="deleteHomeTx()" style="margin-right:auto;display:none">🗑 Eliminar</button>
       <button class="btn btn-ghost" onclick="closeHomeTxModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveHomeTx()">Guardar</button>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <label>Adjuntos</label>
+      <div class="attach-list-slot"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button type="button" class="btn btn-ghost" onclick="triggerAttachUpload()" style="font-size:.78rem;padding:3px 10px;width:fit-content">📎 Adjuntar</button>
+        <span class="attach-uploading" id="home-attach-uploading">⏳ Subiendo...</span>
+      </div>
     </div>
   </div>
 </div>
@@ -1822,7 +1847,7 @@ const COL_DEFS = {
   history: {
     date:        { label: 'Fecha',       fn: t => `<td>${t.date}</td>` },
     amount:      { label: 'Monto',       fn: t => `<td class="amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}${recBadge(t)}</td>` },
-    description: { label: 'Descripción', fn: t => `<td>${t.description}</td>` },
+    description: { label: 'Descripción', fn: t => `<td>${t.description}${t.attachments?.length?`<span class="attach-badge">📎${t.attachments.length}</span>`:''}</td>` },
     type:        { label: 'Tipo',        fn: t => `<td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>` },
     category:    { label: 'Categoría',   fn: t => `<td>${renderCatDot(t.category)}${catLabel(t.category)}${renderBudgetBar(t.category, t.date)}</td>` },
     notes:       { label: 'Notas',       fn: t => `<td>${renderNote(t.notes)}</td>` },
@@ -1839,7 +1864,7 @@ const COL_DEFS = {
   home: {
     date:        { label: 'Fecha',       fn: t => `<td>${t.date}</td>` },
     amount:      { label: 'Monto',       fn: t => `<td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${fmtH(t.amount)}${recBadge(t)}</td>` },
-    description: { label: 'Descripción', fn: t => `<td>${t.description}</td>` },
+    description: { label: 'Descripción', fn: t => `<td>${t.description}${t.attachments?.length?`<span class="attach-badge">📎${t.attachments.length}</span>`:''}</td>` },
     type:        { label: 'Tipo',        fn: t => `<td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>` },
     category:    { label: 'Categoría',   fn: t => `<td>${renderCatDot(t.category)}<span class="home-cat-badge">${homeCatLabel(t.category)}</span></td>` },
     notes:       { label: 'Notas',       fn: t => `<td>${renderNote(t.notes)}</td>` },
@@ -1847,7 +1872,7 @@ const COL_DEFS = {
   custom: {
     date:        { label: 'Fecha',       fn: (t,curr) => `<td>${t.date}</td>` },
     amount:      { label: 'Monto',       fn: (t,curr) => `<td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${curr}${t.amount.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})}${recBadge(t)}</td>` },
-    description: { label: 'Descripción', fn: (t,curr) => `<td>${t.description}</td>` },
+    description: { label: 'Descripción', fn: (t,curr) => `<td>${t.description}${t.attachments?.length?`<span class="attach-badge">📎${t.attachments.length}</span>`:''}</td>` },
     type:        { label: 'Tipo',        fn: (t,curr) => `<td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>` },
     category:    { label: 'Categoría',   fn: (t,curr) => `<td>${renderCatDot(t.category)}<span class="home-cat-badge">${catLabel(t.category)}</span></td>` },
     notes:       { label: 'Notas',       fn: (t,curr) => `<td>${renderNote(t.notes)}</td>` },
@@ -2858,9 +2883,11 @@ function openTxModal(id) {
     if (t) document.getElementById('tx-cat').value = t.category;
   }
   modal.classList.add('open');
+  _attachInit(id ? txs.find(x=>x.id===id)?.attachments : null);
 }
 
 function closeTxModal() {
+  _attachOnClose();
   document.getElementById('tx-modal').classList.remove('open');
   editingId = null;
 }
@@ -2882,15 +2909,15 @@ function saveTx() {
 
   const recurringNext = recurring ? nextOccurrence(date, recurring) : undefined;
 
+  _attachSaved = true;
   if (id) {
     const idx = txs.findIndex(t=>t.id===parseInt(id));
     if (idx >= 0) {
-      const prev = txs[idx];
-      txs[idx] = {id:parseInt(id),date,amount,description:desc,type,category:cat,notes,recurring};
+      txs[idx] = {id:parseInt(id),date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments]};
       if (recurring) txs[idx].recurringNext = recurringNext;
     }
   } else {
-    const tx = {id:nextId++,date,amount,description:desc,type,category:cat,notes,recurring};
+    const tx = {id:nextId++,date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments]};
     if (recurring) tx.recurringNext = recurringNext;
     txs.push(tx);
   }
@@ -3196,9 +3223,12 @@ function openHomeTxModal(id) {
   }
   updateHomeTxColorPicker();
   document.getElementById('home-tx-modal').classList.add('open');
+  const _homeTx = id ? homeTxs.find(x=>x.id===id) : null;
+  _attachInit(_homeTx?.attachments);
 }
 
 function closeHomeTxModal() {
+  _attachOnClose();
   document.getElementById('home-tx-modal').classList.remove('open');
   activeCustomMenuId = null;
 }
@@ -3220,16 +3250,17 @@ function saveHomeTx() {
     alert('Por favor completa fecha, monto y descripción.');
     return;
   }
+  _attachSaved = true;
   const recurringNext = recurring ? nextOccurrence(date, recurring) : undefined;
   if (id) {
     const idx = homeTxs.findIndex(t=>t.id===parseInt(id));
     if (idx >= 0) {
-      homeTxs[idx] = { ...homeTxs[idx], date, amount, description:desc, type, category:cat, notes, recurring };
+      homeTxs[idx] = { ...homeTxs[idx], date, amount, description:desc, type, category:cat, notes, recurring, attachments:[..._modalAttachments] };
       if (recurring) homeTxs[idx].recurringNext = recurringNext;
       else delete homeTxs[idx].recurringNext;
     }
   } else {
-    const tx = { id:nextHomeId++, date, amount, description:desc, type, category:cat, notes, recurring };
+    const tx = { id:nextHomeId++, date, amount, description:desc, type, category:cat, notes, recurring, attachments:[..._modalAttachments] };
     if (recurring) tx.recurringNext = recurringNext;
     homeTxs.push(tx);
   }
@@ -4355,6 +4386,8 @@ function openCustomTxModal(menuId, txId) {
   }
   updateHomeTxColorPicker();
   document.getElementById('home-tx-modal').classList.add('open');
+  const _cmTx = txId ? m.data.find(x=>x.id===txId) : null;
+  _attachInit(_cmTx?.attachments);
 }
 
 
@@ -4372,16 +4405,17 @@ function saveCustomTx(menuId) {
   if (!date || isNaN(amount) || amount<=0 || !desc) { alert('Completa fecha, monto y descripción.'); return; }
   if (!m.data) m.data = [];
   if (!m.nextDataId) m.nextDataId = 1;
+  _attachSaved = true;
   const recurringNext = recurring ? nextOccurrence(date, recurring) : undefined;
   if (id) {
     const idx = m.data.findIndex(t=>t.id===parseInt(id));
     if (idx>=0) {
-      m.data[idx]={...m.data[idx],date,amount,description:desc,type,category:cat,notes,recurring};
+      m.data[idx]={...m.data[idx],date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments]};
       if (recurring) m.data[idx].recurringNext = recurringNext;
       else delete m.data[idx].recurringNext;
     }
   } else {
-    const tx={id:m.nextDataId++,date,amount,description:desc,type,category:cat,notes,recurring};
+    const tx={id:m.nextDataId++,date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments]};
     if (recurring) tx.recurringNext = recurringNext;
     m.data.push(tx);
   }
@@ -6026,6 +6060,111 @@ function openUserMenu() {
   showConfirm(`Sesión activa: ${currentUser.name} (${currentUser.role})\nExpira en ~${remaining}h\n\n¿Cerrar sesión?`,
     logout, {icon: currentUser.name.charAt(0).toUpperCase(), okLabel:'Cerrar sesión', primary:false});
 }
+
+// ============================================================
+// ADJUNTOS — File attachments per record
+// ============================================================
+let _modalAttachments   = [];  // adjuntos del registro abierto (guardados + nuevos)
+let _modalNewAttachments = []; // sólo los subidos en esta sesión de modal (para limpieza)
+let _attachUploading     = false;
+let _attachSaved         = false; // evita limpiar al cerrar modal tras guardar
+
+function triggerAttachUpload() {
+  const inp = document.getElementById('attach-file-input');
+  inp.value = '';
+  inp.click();
+}
+
+function _attachSetUploading(v) {
+  _attachUploading = v;
+  ['tx-attach-uploading','home-attach-uploading'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = v ? 'inline' : 'none';
+  });
+}
+
+function renderAttachmentList() {
+  const open = document.querySelector('.modal-overlay.open');
+  if (!open) return;
+  const slot = open.querySelector('.attach-list-slot');
+  if (!slot) return;
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  slot.innerHTML = _modalAttachments.map(a => {
+    const ico = (a.mimeType||'').startsWith('image') ? '🖼️' : '📄';
+    return `<div class="attach-item"><span>${ico}</span><a href="${a.viewUrl}" target="_blank" rel="noopener" title="${esc(a.name)}">${esc(a.name)}</a><button class="attach-del" onclick="removeAttachment('${esc(a.fileId)}')" title="Quitar">✕</button></div>`;
+  }).join('');
+}
+
+function handleAttachUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) {
+    alert('Archivo muy grande. Máximo 8 MB.');
+    input.value = '';
+    return;
+  }
+  _attachSetUploading(true);
+  const reader = new FileReader();
+  reader.onload = e => {
+    const base64 = e.target.result.split(',')[1];
+    const onOk = r => {
+      _attachSetUploading(false);
+      input.value = '';
+      if (r && r.ok) {
+        const att = { fileId: r.fileId, viewUrl: r.viewUrl, name: file.name, mimeType: file.type };
+        _modalAttachments.push(att);
+        _modalNewAttachments.push(att);
+        renderAttachmentList();
+      } else { alert('Error al subir archivo: ' + (r?.error || 'desconocido')); }
+    };
+    const onErr = () => { _attachSetUploading(false); input.value = ''; alert('Error de red al subir archivo.'); };
+    if (inAppsScript) {
+      google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).uploadAttachment(file.name, file.type, base64);
+    } else {
+      const url = getApiUrl();
+      if (!url) { onErr(); return; }
+      fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=UTF-8'},
+        body: JSON.stringify({ action:'uploadAttachment', fileName:file.name, mimeType:file.type, base64Data:base64 }) })
+        .then(r => r.json()).then(onOk).catch(onErr);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeAttachment(fileId) {
+  _modalAttachments    = _modalAttachments.filter(a => a.fileId !== fileId);
+  _modalNewAttachments = _modalNewAttachments.filter(a => a.fileId !== fileId);
+  renderAttachmentList();
+  _gasDeleteAttachment(fileId);
+}
+
+function _gasDeleteAttachment(fileId) {
+  if (inAppsScript) {
+    google.script.run.deleteAttachment(fileId);
+  } else {
+    const url = getApiUrl();
+    if (url) fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=UTF-8'},
+      body: JSON.stringify({ action:'deleteAttachment', fileId }) }).catch(() => {});
+  }
+}
+
+function _attachInit(savedAtts) {
+  _modalAttachments    = [...(savedAtts || [])];
+  _modalNewAttachments = [];
+  _attachSaved         = false;
+  renderAttachmentList();
+}
+
+function _attachOnClose() {
+  if (!_attachSaved) {
+    // usuario canceló → borrar archivos nuevos subidos en esta sesión
+    _modalNewAttachments.forEach(a => _gasDeleteAttachment(a.fileId));
+  }
+  _modalAttachments    = [];
+  _modalNewAttachments = [];
+  _attachSaved         = false;
+}
 </script>
+<input type="file" id="attach-file-input" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="handleAttachUpload(this)">
 </body>
 </html>
