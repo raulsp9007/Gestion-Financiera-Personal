@@ -1781,6 +1781,7 @@ let homeTxs = [];
 let users = [];        // [{id, name, password, role}]
 let customMenus = [];  // [{id, name, icon, currency, pin, access, catsInc, catsExp, data, nextId, charts}]
 let navOrder = [];     // ['dashboard','deudas','home','custom-1',...]
+let hiddenNavItems = []; // menus estáticos/custom deshabilitados por admin
 let sessionSeed = ''; // token de invalidación global — si cambia, todas las sesiones expiran
 let budgets = {};     // {catKey: {monthly: amount}} — presupuesto mensual por categoría
 let savingsGoals = []; // [{id, name, icon, target, current, deadline, color}]
@@ -1999,6 +2000,7 @@ function initFromDrive(data) {
       nextMenuId = Math.max(...customMenus.map(m=>m.id))+1;
     }
     if (c.navOrder && c.navOrder.length) navOrder = c.navOrder;
+    if (c.hiddenNavItems) hiddenNavItems = c.hiddenNavItems;
     if (c.sessionSeed) sessionSeed = c.sessionSeed;
     else { sessionSeed = Date.now().toString(36); }
     if (c.budgets) budgets = c.budgets;
@@ -2081,7 +2083,7 @@ function pushToDrive() {
     version: 1,
     lastUpdated: new Date().toISOString(),
     config: {
-      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, sessionSeed:sessionSeed, budgets:budgets, savingsGoals:savingsGoals,
+      globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, hiddenNavItems:hiddenNavItems, sessionSeed:sessionSeed, budgets:budgets, savingsGoals:savingsGoals,
       colConfig: JSON.parse(localStorage.getItem('cashmap_col_config') || '{}'),
       forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder
     },
@@ -2183,6 +2185,7 @@ function applyRemoteData(data) {
     if (c.globalCats) { globalCats = c.globalCats; rebuildLegacyCatMaps(); }
     if (c.homeCurr) HOME_CURR = c.homeCurr;
     if (c.navOrder && Array.isArray(c.navOrder)) navOrder = c.navOrder;
+    if (c.hiddenNavItems) hiddenNavItems = c.hiddenNavItems;
     if (c.customMenus) {
       customMenus = c.customMenus;
       buildCustomMenuViews();
@@ -3932,7 +3935,7 @@ function buildBottomNav() {
   const hidden = (currentUser && currentUser.role !== 'admin') ? (currentUser.hiddenMenus || []) : [];
   const allKeys = ['dashboard','deudas','home','balance',...customMenus.map(m=>'custom-'+m.id)];
   allKeys.forEach(k => { if (!navOrder.includes(k)) navOrder.push(k); });
-  const orderedVisible = navOrder.filter(k => allKeys.includes(k) && !hidden.includes(k));
+  const orderedVisible = navOrder.filter(k => allKeys.includes(k) && !hidden.includes(k) && !hiddenNavItems.includes(k));
 
   // Eliminar items dinámicos previos
   nav.querySelectorAll('a.bn-dyn').forEach(el => el.remove());
@@ -3979,7 +3982,7 @@ function buildSidebarNav() {
   allKeys.forEach(k => { if (!navOrder.includes(k)) navOrder.push(k); });
   navOrder = navOrder.filter(k => allKeys.includes(k));
   nav.innerHTML = navOrder.map(key => {
-    if (hidden.includes(key)) return '';
+    if (hidden.includes(key) || hiddenNavItems.includes(key)) return '';
     if (STATIC_NAV[key]) {
       const {label, ico, view} = STATIC_NAV[key];
       return `<a data-view="${view}" onclick="switchView(this)"><span class="ico">${ico}</span> ${label}</a>`;
@@ -4062,7 +4065,7 @@ function buildMoreDrawer() {
   const drawer = document.getElementById('more-drawer');
   const hidden = (currentUser && currentUser.role !== 'admin') ? (currentUser.hiddenMenus || []) : [];
   const allKeys = ['dashboard','deudas','home','balance',...customMenus.map(m=>'custom-'+m.id)];
-  const orderedVisible = navOrder.filter(k => allKeys.includes(k) && !hidden.includes(k));
+  const orderedVisible = navOrder.filter(k => allKeys.includes(k) && !hidden.includes(k) && !hiddenNavItems.includes(k));
   const overflowKeys = orderedVisible.slice(3); // items que no caben en bottom nav
 
   const html = overflowKeys.map(key => {
@@ -4642,9 +4645,11 @@ function renderNavOrderTab() {
       if (!m) return '';
       label = m.name; ico = m.icon;
     }
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
+    const isHidden = hiddenNavItems.includes(key);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);border-radius:8px;margin-bottom:6px;opacity:${isHidden?'.45':'1'}">
       <span style="font-size:1.1rem">${ico}</span>
       <span style="flex:1;font-size:.87rem;font-weight:500">${label}</span>
+      <button onclick="toggleNavItem('${key}')" title="${isHidden?'Mostrar':'Ocultar'}" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;font-size:.9rem;color:${isHidden?'var(--red)':'var(--text2)'}">${isHidden?'🚫':'👁'}</button>
       <button onclick="moveNavItem(${i},-1)" ${i===0?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;color:var(--text2);font-size:.9rem">▲</button>
       <button onclick="moveNavItem(${i},1)" ${i===navOrder.length-1?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;color:var(--text2);font-size:.9rem">▼</button>
     </div>`;
@@ -4656,6 +4661,23 @@ function moveNavItem(idx, dir) {
   if (ni < 0 || ni >= navOrder.length) return;
   [navOrder[idx], navOrder[ni]] = [navOrder[ni], navOrder[idx]];
   buildSidebarNav();
+  buildMoreDrawer();
+  renderNavOrderTab();
+  scheduleSave();
+}
+
+function toggleNavItem(key) {
+  const idx = hiddenNavItems.indexOf(key);
+  if (idx === -1) {
+    hiddenNavItems.push(key);
+    // Si estaba activo, redirigir a dashboard
+    const hiddenView = STATIC_NAV[key]?.view || 'view-custom-' + key.replace('custom-','');
+    if (currentView === hiddenView) switchView(document.querySelector('[data-view="view-dashboard"]'));
+  } else {
+    hiddenNavItems.splice(idx, 1);
+  }
+  buildSidebarNav();
+  buildBottomNav();
   buildMoreDrawer();
   renderNavOrderTab();
   scheduleSave();
