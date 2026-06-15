@@ -6125,7 +6125,7 @@ function handleAttachUpload(input) {
       if (!url) { onErr(); return; }
       fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=UTF-8'},
         body: JSON.stringify({ action:'uploadAttachment', fileName:file.name, mimeType:file.type, base64Data:base64 }) })
-        .then(r => r.json()).then(onOk).catch(onErr);
+        .then(r => r.text()).then(t => { console.log('[attach] GAS raw:', t); return JSON.parse(t); }).then(onOk).catch(e => { console.error('[attach] error:', e); onErr(); });
     }
   };
   reader.readAsDataURL(file);
