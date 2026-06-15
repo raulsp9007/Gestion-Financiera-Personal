@@ -6088,7 +6088,7 @@ function renderAttachmentList() {
   if (!open) return;
   const slot = open.querySelector('.attach-list-slot');
   if (!slot) return;
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   slot.innerHTML = _modalAttachments.map(a => {
     const ico = (a.mimeType||'').startsWith('image') ? '🖼️' : '📄';
     return `<div class="attach-item"><span>${ico}</span><a href="${a.viewUrl}" target="_blank" rel="noopener" title="${esc(a.name)}">${esc(a.name)}</a><button class="attach-del" onclick="removeAttachment('${esc(a.fileId)}')" title="Quitar">✕</button></div>`;
@@ -6110,8 +6110,7 @@ function handleAttachUpload(input) {
     const onOk = r => {
       _attachSetUploading(false);
       input.value = '';
-      alert('[DEBUG] r = ' + JSON.stringify(r));
-      if (r && r.ok) {
+      if (r && r.ok && r.fileId) {
         const att = { fileId: r.fileId, viewUrl: r.viewUrl, name: file.name, mimeType: file.type };
         _modalAttachments.push(att);
         _modalNewAttachments.push(att);
@@ -6126,7 +6125,7 @@ function handleAttachUpload(input) {
       if (!url) { onErr(); return; }
       fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=UTF-8'},
         body: JSON.stringify({ action:'uploadAttachment', fileName:file.name, mimeType:file.type, base64Data:base64 }) })
-        .then(r => r.text()).then(t => { console.log('[attach] GAS raw:', t); try { return JSON.parse(t); } catch(pe) { alert('[DEBUG] Respuesta del servidor:\n' + t.substring(0,300)); throw pe; } }).then(onOk).catch(e => { console.error('[attach] error:', e); if(e.name!=='SyntaxError') alert('[DEBUG] Error de red:\n' + e.message); onErr(); });
+        .then(r => r.json()).then(onOk).catch(onErr);
     }
   };
   reader.readAsDataURL(file);
