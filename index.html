@@ -824,7 +824,16 @@
   /* 5: Recurring indicator */
   .rec-badge{display:inline-flex;align-items:center;gap:3px;font-size:.65rem;padding:1px 6px;border-radius:99px;background:rgba(139,92,246,.15);color:#a78bfa;font-weight:600;margin-left:4px}
 
-  /* 6: External donut chart tooltip */
+  /* 6: Presence widget (admin only) */
+  #presence-widget{padding:8px 12px;border-top:1px solid var(--border);display:none}
+  .presence-title{font-size:.65rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text2);margin-bottom:6px}
+  .presence-user{display:flex;align-items:center;gap:7px;padding:4px 0;font-size:.78rem}
+  .presence-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;box-shadow:0 0 5px var(--green)}
+  .presence-name{flex:1;font-weight:500;color:var(--text)}
+  .presence-role-chip{font-size:.6rem;padding:1px 5px;border-radius:99px;background:var(--bg3);color:var(--text2)}
+  .presence-ago{font-size:.65rem;color:var(--text2)}
+
+  /* 7: External donut chart tooltip */
   .chart-tooltip-ext{position:fixed;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;pointer-events:none;z-index:9999;max-width:260px;min-width:150px;font-size:.78rem;color:var(--text);box-shadow:0 4px 24px rgba(0,0,0,.5);opacity:0;transition:opacity .12s}
   .ctt-title{font-weight:700;font-size:.82rem;display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap}
   .ctt-total{color:var(--acc);margin-left:auto;white-space:nowrap}
@@ -882,6 +891,7 @@
     <p>Gestión Financiera Personal</p>
   </div>
   <nav id="sidebar-nav"></nav>
+  <div id="presence-widget"></div>
   <div id="user-area" style="padding:10px 12px;border-top:1px solid var(--border);display:none">
     <div id="user-badge" onclick="openUserMenu()">
       <span id="user-badge-name">—</span>
@@ -1920,6 +1930,7 @@ let pendingOfflineChanges = false;
 let _pollTimer = null;
 let _pendingLocalChanges = false;
 let deletedIds = []; // tombstone para merge concurrente
+let onlinePresence = {}; // { userId: { id, name, role, lastSeen } }
 let _applyingRemote = false;
 let _renderPending = false;
 // BroadcastChannel: sync instantáneo entre pestañas del mismo navegador
@@ -2011,6 +2022,7 @@ function initFromDrive(data) {
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
   }
   if (data && data.deletedIds) deletedIds = [...new Set([...deletedIds, ...data.deletedIds])];
+  if (data && data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
   if (data && data.lastUpdated) lastUpdatedStr = data.lastUpdated;
   // Señal de recarga forzada por admin
   const _ackReload = parseInt(localStorage.getItem('cashmap_force_reload_ack') || '0');
@@ -2065,6 +2077,12 @@ function mergeData(local, remote) {
     const lm = (local.config?.customMenus||[]).find(x => x.id === rm.id);
     return { ...rm, data: mergeArr(lm?.data||[], rm.data||[]) };
   });
+  const mergedPresence = {};
+  [remote.presence, local.presence].forEach(p => {
+    Object.entries(p || {}).forEach(([uid, val]) => {
+      if (!mergedPresence[uid] || val.lastSeen > mergedPresence[uid].lastSeen) mergedPresence[uid] = val;
+    });
+  });
   return {
     ...remote,
     transactions: mergeArr(local.transactions, remote.transactions),
@@ -2072,6 +2090,7 @@ function mergeData(local, remote) {
     home:         mergeArr(local.home,          remote.home),
     config:       { ...remote.config, customMenus: mergedMenus },
     deletedIds:   [...allDel],
+    presence:     mergedPresence,
     lastUpdated:  new Date().toISOString()
   };
 }
@@ -2088,7 +2107,8 @@ function pushToDrive() {
       forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder
     },
     transactions:txs, deudas:deudas, home:homeTxs,
-    deletedIds: [...new Set(deletedIds)]
+    deletedIds: [...new Set(deletedIds)],
+    presence: currentUser ? { ...onlinePresence, [currentUser.id]: { id:currentUser.id, name:currentUser.name, role:currentUser.role, lastSeen:new Date().toISOString() } } : onlinePresence
   };
 
   // Siempre guardar en localStorage (offline backup)
@@ -2198,6 +2218,7 @@ function applyRemoteData(data) {
     if (c.savingsGoals) { savingsGoals = c.savingsGoals; if (savingsGoals.length) _nextGoalId = Math.max(...savingsGoals.map(g=>g.id))+1; }
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
   }
+  if (data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
   if (data.lastUpdated) lastUpdatedStr = data.lastUpdated;
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(data));
@@ -3839,11 +3860,27 @@ function doLogin() {
   renderApp();
 }
 
+function renderPresenceWidget() {
+  const el = document.getElementById('presence-widget');
+  if (!el) return;
+  if (!currentUser || currentUser.role !== 'admin') { el.style.display = 'none'; return; }
+  const now = Date.now();
+  const online = Object.values(onlinePresence)
+    .filter(u => u.id !== currentUser.id && (now - new Date(u.lastSeen).getTime()) < 3 * 60 * 1000)
+    .sort((a, b) => b.lastSeen.localeCompare(a.lastSeen));
+  if (!online.length) { el.style.display = 'none'; return; }
+  const ago = ts => { const s = Math.round((now - new Date(ts).getTime()) / 1000); return s < 60 ? 'ahora' : Math.round(s/60) + 'm'; };
+  el.style.display = 'block';
+  el.innerHTML = `<div class="presence-title">🟢 En línea</div>` +
+    online.map(u => `<div class="presence-user"><span class="presence-dot"></span><span class="presence-name">${u.name}</span><span class="presence-role-chip">${u.role}</span><span class="presence-ago">${ago(u.lastSeen)}</span></div>`).join('');
+}
+
 function renderApp() {
   applyRoleUI();
   buildCustomMenuViews();
   renderNavForUser();
   renderAll();
+  renderPresenceWidget();
   // Default view: primer menú custom accesible — se aplica DESPUÉS de renderAll
   const firstMenu = customMenus.find(m => canAccess(m.access));
   if (firstMenu) {
@@ -3852,6 +3889,14 @@ function renderApp() {
   }
   // Procesar transacciones recurrentes automáticamente
   try { processRecurringAuto(); } catch(e) {}
+  // Heartbeat de presencia: push cada 60s aunque no haya cambios
+  if (!window._presenceHeartbeat) {
+    window._presenceHeartbeat = setInterval(() => {
+      if (currentUser && navigator.onLine) pushToDrive();
+    }, 60000);
+    // Ping inicial tras 3s (dejar que initFromDrive termine)
+    setTimeout(() => { if (currentUser && navigator.onLine) pushToDrive(); }, 3000);
+  }
 }
 
 function invalidateAllSessions() {
