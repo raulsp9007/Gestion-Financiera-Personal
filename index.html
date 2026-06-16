@@ -2243,10 +2243,18 @@ function applyRemoteData(data) {
     const c = data.config;
     if (c.globalCats) { globalCats = c.globalCats; rebuildLegacyCatMaps(); }
     if (c.homeCurr) HOME_CURR = c.homeCurr;
-    if (c.navOrder && Array.isArray(c.navOrder)) navOrder = c.navOrder;
+    if (c.navOrder && Array.isArray(c.navOrder)) {
+      const remoteNavSet = new Set(c.navOrder);
+      navOrder = [...c.navOrder, ...navOrder.filter(k => !remoteNavSet.has(k))];
+    }
     if (c.hiddenNavItems) hiddenNavItems = c.hiddenNavItems;
     if (c.customMenus) {
-      customMenus = c.customMenus;
+      const allDel = new Set(deletedIds);
+      const remoteMenuIds = new Set(c.customMenus.map(m => m.id));
+      customMenus = [
+        ...c.customMenus,
+        ...customMenus.filter(m => !remoteMenuIds.has(m.id) && !allDel.has(m.id))
+      ];
       buildCustomMenuViews();
       // Restaurar vista activa — buildCustomMenuViews destruye el DOM de custom views
       const activeEl = document.getElementById(currentView);
