@@ -2102,10 +2102,14 @@ function mergeData(local, remote) {
     (loc||[]).forEach(t => { if (!allDel.has(t.id)) map[t.id] = t; }); // local gana mismo id
     return Object.values(map);
   };
-  const mergedMenus = (remote.config?.customMenus||[]).map(rm => {
-    const lm = (local.config?.customMenus||[]).find(x => x.id === rm.id);
-    return { ...rm, data: mergeArr(lm?.data||[], rm.data||[]) };
-  });
+  const remoteMenuIds = new Set((remote.config?.customMenus||[]).map(m => m.id));
+  const mergedMenus = [
+    ...(remote.config?.customMenus||[]).map(rm => {
+      const lm = (local.config?.customMenus||[]).find(x => x.id === rm.id);
+      return { ...rm, data: mergeArr(lm?.data||[], rm.data||[]) };
+    }),
+    ...(local.config?.customMenus||[]).filter(lm => !remoteMenuIds.has(lm.id))
+  ];
   const mergedPresence = {};
   [remote.presence, local.presence].forEach(p => {
     Object.entries(p || {}).forEach(([uid, val]) => {
