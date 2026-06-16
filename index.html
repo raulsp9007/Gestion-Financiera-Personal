@@ -2110,6 +2110,12 @@ function mergeData(local, remote) {
     }),
     ...(local.config?.customMenus||[]).filter(lm => !remoteMenuIds.has(lm.id))
   ];
+  // navOrder: remote order + any local-only keys (e.g. newly created menu not yet in Drive)
+  const remoteNavSet = new Set(remote.config?.navOrder || []);
+  const mergedNavOrder = [
+    ...(remote.config?.navOrder || []),
+    ...(local.config?.navOrder || []).filter(k => !remoteNavSet.has(k))
+  ];
   const mergedPresence = {};
   [remote.presence, local.presence].forEach(p => {
     Object.entries(p || {}).forEach(([uid, val]) => {
@@ -2121,7 +2127,7 @@ function mergeData(local, remote) {
     transactions: mergeArr(local.transactions, remote.transactions),
     deudas:       mergeArr(local.deudas,       remote.deudas),
     home:         mergeArr(local.home,          remote.home),
-    config:       { ...remote.config, customMenus: mergedMenus },
+    config:       { ...remote.config, customMenus: mergedMenus, navOrder: mergedNavOrder },
     deletedIds:   [...allDel],
     presence:     mergedPresence,
     lastUpdated:  new Date().toISOString()
