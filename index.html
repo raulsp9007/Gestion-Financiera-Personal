@@ -2660,6 +2660,8 @@ function renderDashCustomMenus() {
 
   // Helper: genera HTML de una card
   function buildCard(id, icon, name, curr, data) {
+  const hidden = isDashCardHidden(id);
+  style="${hidden ? 'display:none' : ''}"
   const fmtC = v => curr + (v||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
   const totalInc = data.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
   const totalExp = data.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
@@ -5935,7 +5937,8 @@ function openDashOrderModal() {
   allKeys.forEach(k => { if (!dashCardOrder.includes(k)) dashCardOrder.push(k); });
   dashCardOrder = dashCardOrder.filter(k => allKeys.includes(k));
   _dashOrderTemp = [...dashCardOrder];
-  _dashOrderTempHidden = [...getHiddenDashCards()];  // Cargar las ocultas actuales
+  _dashOrderTempHidden = [...getHiddenDashCards()]; // copia fresca
+  console.log('Ocultas al abrir modal:', _dashOrderTempHidden);
   _renderDashOrderList();
   document.getElementById('dash-order-modal').classList.add('open');
 }
@@ -5963,11 +5966,13 @@ function _renderDashOrderList() {
 function _dashToggleVisibility(key) {
   const idx = _dashOrderTempHidden.indexOf(key);
   if (idx >= 0) {
-    _dashOrderTempHidden.splice(idx, 1);  // Quitar de ocultas → mostrarla
+    _dashOrderTempHidden.splice(idx, 1);
+    console.log('Mostrando tarjeta:', key);
   } else {
-    _dashOrderTempHidden.push(key);        // Añadir a ocultas → esconderla
+    _dashOrderTempHidden.push(key);
+    console.log('Ocultando tarjeta:', key);
   }
-  _renderDashOrderList();  // Refrescar la lista del modal
+  _renderDashOrderList();
 }
 function _dashMove(idx, dir) {
   const ni = idx + dir;
@@ -5977,10 +5982,21 @@ function _dashMove(idx, dir) {
 }
 
 function saveDashOrderModal() {
+  console.log('Guardando orden:', _dashOrderTemp);
+  console.log('Guardando ocultas:', _dashOrderTempHidden);
+  
   dashCardOrder = [..._dashOrderTemp];
+  setHiddenDashCards(_dashOrderTempHidden);
+  
   closeDashOrderModal();
+  
+  // Forzar un re-render completo de todo el dashboard
   renderDashCustomMenus();
+  renderAll(); // Asegura que todas las vistas se refresquen
+  
   if (currentUser && currentUser.role === 'admin') scheduleSave();
+  
+  console.log('Estado guardado. Ocultas ahora:', getHiddenDashCards());
 }
 
 // click-outside dash-order-modal
