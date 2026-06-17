@@ -2630,39 +2630,43 @@ function renderDashCustomMenus() {
 
   // Helper: genera HTML de una card
   function buildCard(id, icon, name, curr, data) {
-    const fmtC = v => curr + (v||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
-    const totalInc = data.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-    const totalExp = data.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-    const net = totalInc - totalExp;
-    const netClass = net >= 0 ? 'net-pos' : 'net-neg';
-    const netStr = (net>=0?'+':'') + fmtC(Math.abs(net));
-    const charts = data.length === 0
-      ? `<div class="dcm-empty">Sin registros aún</div>`
-      : `<div class="dcm-charts">
-           <div class="dcm-chart-wrap">
-             <div class="dcm-chart-lbl">💚 Ingresos por cat.</div>
-             <canvas id="dcm-chart-inc-${id}"></canvas>
-           </div>
-           <div class="dcm-chart-wrap">
-             <div class="dcm-chart-lbl">🔴 Gastos por cat.</div>
-             <canvas id="dcm-chart-exp-${id}"></canvas>
-           </div>
-         </div>`;
-    return `
-    <div class="dcm-card">
-      <div class="dcm-card-head">
-        <div class="dcm-card-icon">${icon}</div>
-        <div class="dcm-card-name">${name}</div>
-        <span class="dcm-card-curr">${curr.trim()}</span>
-      </div>
-      <div class="dcm-stats">
-        <div class="dcm-stat"><div class="lbl">Ingresos</div><div class="val income">${fmtC(totalInc)}</div></div>
-        <div class="dcm-stat"><div class="lbl">Gastos</div><div class="val expense">${fmtC(totalExp)}</div></div>
-        <div class="dcm-stat"><div class="lbl">Balance</div><div class="val ${netClass}">${netStr}</div></div>
-      </div>
-      ${charts}
-    </div>`;
-  }
+  const fmtC = v => curr + (v||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const totalInc = data.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const totalExp = data.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const net = totalInc - totalExp;
+  const netClass = net >= 0 ? 'net-pos' : 'net-neg';
+  const netStr = (net>=0?'+':'') + fmtC(Math.abs(net));
+  const hiddenClass = isDashCardHidden(id) ? 'dcm-card-hidden' : '';  // ← nueva clase
+  const charts = data.length === 0
+    ? `<div class="dcm-empty">Sin registros aún</div>`
+    : `<div class="dcm-charts">
+         <div class="dcm-chart-wrap">
+           <div class="dcm-chart-lbl">💚 Ingresos por cat.</div>
+           <canvas id="dcm-chart-inc-${id}"></canvas>
+         </div>
+         <div class="dcm-chart-wrap">
+           <div class="dcm-chart-lbl">🔴 Gastos por cat.</div>
+           <canvas id="dcm-chart-exp-${id}"></canvas>
+         </div>
+       </div>`;
+  return `
+  <div class="dcm-card ${hiddenClass}" data-card-id="${id}" style="${isDashCardHidden(id) ? 'display:none' : ''}">
+    <div class="dcm-card-head">
+      <div class="dcm-card-icon">${icon}</div>
+      <div class="dcm-card-name">${name}</div>
+      <span class="dcm-card-curr">${curr.trim()}</span>
+      <button class="btn-icon dcm-toggle-btn" onclick="toggleDashCard('${id}')" title="Ocultar/Mostrar tarjeta">
+        ${isDashCardHidden(id) ? '🙈' : '👁️'}
+      </button>
+    </div>
+    <div class="dcm-stats">
+      <div class="dcm-stat"><div class="lbl">Ingresos</div><div class="val income">${fmtC(totalInc)}</div></div>
+      <div class="dcm-stat"><div class="lbl">Gastos</div><div class="val expense">${fmtC(totalExp)}</div></div>
+      <div class="dcm-stat"><div class="lbl">Balance</div><div class="val ${netClass}">${netStr}</div></div>
+    </div>
+    ${charts}
+  </div>`;
+}
 
   // Construir mapa de secciones disponibles
   const _dcmSections = {
@@ -6692,3 +6696,34 @@ function _attachOnClose() {
 </div>
 </body>
 </html>
+// ============================================================
+// DASHBOARD CARD VISIBILITY (localStorage)
+// ============================================================
+function getHiddenDashCards() {
+  try {
+    return JSON.parse(localStorage.getItem('cashmap_hidden_dash_cards') || '[]');
+  } catch(e) { return []; }
+}
+
+function setHiddenDashCards(hiddenList) {
+  localStorage.setItem('cashmap_hidden_dash_cards', JSON.stringify(hiddenList));
+}
+
+function isDashCardHidden(id) {
+  return getHiddenDashCards().includes(id);
+}
+
+function toggleDashCard(id) {
+  let hidden = getHiddenDashCards();
+  const idx = hidden.indexOf(id);
+  if (idx >= 0) {
+    hidden.splice(idx, 1);
+  } else {
+    hidden.push(id);
+  }
+  setHiddenDashCards(hidden);
+  // Re-renderizar solo las tarjetas (sin recargar toda la página)
+  renderDashCustomMenus();
+  // Opcional: mostrar un mensaje
+  showToast(`Tarjeta ${idx >= 0 ? 'mostrada' : 'oculta'}`, 'var(--acc)');
+}
