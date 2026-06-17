@@ -5950,12 +5950,15 @@ function _renderDashOrderList() {
     home: '🏠 Home Billings',
     ...(customMenus||[]).reduce((a,m) => { a['cm_'+m.id] = m.icon+' '+m.name; return a; }, {})
   };
-  document.getElementById('dash-order-list').innerHTML = _dashOrderTemp.map((key, i) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
-      <span style="flex:1;font-size:.86rem">${labelMap[key]||key}</span>
+  document.getElementById('dash-order-list').innerHTML = _dashOrderTemp.map((key, i) => {
+    const isHidden = _dashOrderTempHidden.includes(key);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:8px;margin-bottom:6px;opacity:${isHidden ? 0.45 : 1}">
+      <span style="flex:1;font-size:.86rem">${labelMap[key]||key} ${isHidden ? '🚫' : ''}</span>
+      <button onclick="_dashToggleVisibility('${key}')" title="${isHidden ? 'Mostrar' : 'Ocultar'}" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;font-size:.9rem;color:${isHidden?'var(--red)':'var(--text2)'}">${isHidden?'🙈':'👁️'}</button>
       <button onclick="_dashMove(${i},-1)" ${i===0?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;color:var(--text2);font-size:.85rem">▲</button>
       <button onclick="_dashMove(${i},1)"  ${i===_dashOrderTemp.length-1?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;color:var(--text2);font-size:.85rem">▼</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 function _dashToggleVisibility(key) {
   const idx = _dashOrderTempHidden.indexOf(key);
