@@ -1152,6 +1152,7 @@
     <div class="tbl-header">
       <h3>🏠 Registro del hogar <span class="home-curr" id="home-curr-label"></span></h3>
       <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-ghost" onclick="openMenuConfigModal(\'home\')" style="font-size:.75rem;padding:3px 8px" title="Mostrar/Ocultar elementos del menú">👁️ Elementos</button>
         <span id="home-count" style="font-size:.78rem;color:var(--text2)"></span>
         <button class="btn btn-ghost" onclick="exportHomeCSV()" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
         <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('home')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
@@ -1647,6 +1648,23 @@
   </div>
 </div>
 
+<!-- Modal de configuración de visibilidad de elementos del menú -->
+<div class="modal-overlay" id="menu-config-modal">
+  <div class="modal" style="width:400px;max-width:96vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <h3 id="menu-config-title" style="margin:0">👁️ Elementos del menú</h3>
+      <button class="btn btn-ghost" onclick="closeMenuConfigModal()" style="padding:4px 10px">✕</button>
+    </div>
+    <div id="menu-config-body">
+      <!-- Se llenará dinámicamente -->
+    </div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeMenuConfigModal()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
 <div id="toast"></div>
 <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="handleImportFile(this)">
 
@@ -2042,6 +2060,105 @@ function saveColConfig(tableId, order, hidden) {
   localStorage.setItem('cashmap_col_config', JSON.stringify(stored));
 }
 
+
+// ============================================================
+// DASHBOARD CARD VISIBILITY (localStorage)
+// ============================================================
+function getHiddenDashCards() {
+  try {
+    return JSON.parse(localStorage.getItem('cashmap_hidden_dash_cards') || '[]');
+  } catch(e) { return []; }
+}
+
+function setHiddenDashCards(hiddenList) {
+  localStorage.setItem('cashmap_hidden_dash_cards', JSON.stringify(hiddenList));
+}
+
+function isDashCardHidden(id) {
+  return getHiddenDashCards().includes(id);
+}
+
+function toggleDashCard(id) {
+  let hidden = getHiddenDashCards();
+  const idx = hidden.indexOf(id);
+  if (idx >= 0) {
+    hidden.splice(idx, 1);
+  } else {
+    hidden.push(id);
+  }
+  setHiddenDashCards(hidden);
+  renderDashCustomMenus();
+  showToast(`Tarjeta ${idx >= 0 ? 'mostrada' : 'oculta'}`, 'var(--acc)');
+}
+
+// ============================================================
+// MENU ELEMENTS VISIBILITY (weekly, monthly chart, category chart)
+// ============================================================
+function getMenuVisibility(menuId) {
+  try {
+    const all = JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}');
+    return all[menuId] || { weekly: true, monthlyChart: true, categoryChart: true };
+  } catch(e) { return { weekly: true, monthlyChart: true, categoryChart: true }; }
+}
+
+function setMenuVisibility(menuId, visibility) {
+  const all = JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}');
+  all[menuId] = visibility;
+  localStorage.setItem('cashmap_menu_visibility', JSON.stringify(all));
+}
+
+function toggleMenuVisibility(menuId, key) {
+  const vis = getMenuVisibility(menuId);
+  vis[key] = !vis[key];
+  setMenuVisibility(menuId, vis);
+  if (menuId === 'home') {
+    renderHome();
+  } else {
+    const id = parseInt(menuId.replace('custom-',''));
+    if (!isNaN(id)) renderCustomMenuView(id);
+  }
+  const modal = document.getElementById('menu-config-modal');
+  if (modal && modal.classList.contains('open')) {
+    renderMenuConfigModal(menuId);
+  }
+}
+
+// ============================================================
+// MENU CONFIG MODAL
+// ============================================================
+let _menuConfigMenuId = null;
+
+function openMenuConfigModal(menuId) {
+  _menuConfigMenuId = menuId;
+  renderMenuConfigModal(menuId);
+  document.getElementById('menu-config-modal').classList.add('open');
+}
+
+function closeMenuConfigModal() {
+  document.getElementById('menu-config-modal').classList.remove('open');
+  _menuConfigMenuId = null;
+}
+
+function renderMenuConfigModal(menuId) {
+  const vis = getMenuVisibility(menuId);
+  const labelMap = {
+    weekly: '📊 Gastos por semana',
+    monthlyChart: '📈 Ingresos vs Gastos',
+    categoryChart: '🍩 Gastos por categoría'
+  };
+  const body = document.getElementById('menu-config-body');
+  if (!body) return;
+  body.innerHTML = Object.keys(vis).map(key => {
+    const isVisible = vis[key];
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <span style="flex:1;font-size:.9rem">${labelMap[key]}</span>
+      <button onclick="toggleMenuVisibility('${menuId}','${key}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:.85rem;color:${isVisible?'var(--green)':'var(--red)'}">
+        ${isVisible ? '👁️ Visible' : '🙈 Oculto'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
 const DEFAULT_CAT_COLORS = ['#3b82f6','#ef4444','#f59e0b','#22c55e','#8b5cf6','#06b6d4','#ec4899','#f97316'];
 let catColors = {};      // {categoryKey: '#hexcolor'} — Zelle + custom menus
 let homeCatColors = {};  // {categoryKey: '#hexcolor'} — Home Billings
@@ -2184,6 +2301,9 @@ function initFromDrive(data) {
       localStorage.setItem('cashmap_col_config', JSON.stringify(c.colConfig));
     if (c.forceReloadTs) forceReloadTs = c.forceReloadTs;
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
+    if (c.menuVisibility) {
+      localStorage.setItem(\'cashmap_menu_visibility\', JSON.stringify(c.menuVisibility));
+    }
     if (c.menuVisibility) {
       localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
   }
@@ -2469,6 +2589,9 @@ function applyRemoteData(data) {
     if (c.budgets) budgets = c.budgets;
     if (c.savingsGoals) { savingsGoals = c.savingsGoals; if (savingsGoals.length) _nextGoalId = Math.max(...savingsGoals.map(g=>g.id))+1; }
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
+    if (c.menuVisibility) {
+      localStorage.setItem(\'cashmap_menu_visibility\', JSON.stringify(c.menuVisibility));
+    }
   }
   if (data.deletedIds) {
     // No importar tombstones globales para IDs que existen en memoria local (evita corrupción de otros dispositivos)
@@ -2729,46 +2852,44 @@ function renderDashCustomMenus() {
   });
 
   // Helper: genera HTML de una card
-  function buildCard(id, icon, name, curr, data) {
-  const hidden = isDashCardHidden(id);
-  style="${hidden ? 'display:none' : ''}"
-  const fmtC = v => curr + (v||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const totalInc = data.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-  const totalExp = data.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-  const net = totalInc - totalExp;
-  const netClass = net >= 0 ? 'net-pos' : 'net-neg';
-  const netStr = (net>=0?'+':'') + fmtC(Math.abs(net));
-  const hiddenClass = isDashCardHidden(id) ? 'dcm-card-hidden' : '';  // ← nueva clase
-  const charts = data.length === 0
-    ? `<div class="dcm-empty">Sin registros aún</div>`
-    : `<div class="dcm-charts">
-         <div class="dcm-chart-wrap">
-           <div class="dcm-chart-lbl">💚 Ingresos por cat.</div>
-           <canvas id="dcm-chart-inc-${id}"></canvas>
-         </div>
-         <div class="dcm-chart-wrap">
-           <div class="dcm-chart-lbl">🔴 Gastos por cat.</div>
-           <canvas id="dcm-chart-exp-${id}"></canvas>
-         </div>
-       </div>`;
-  return `
-  <div class="dcm-card ${hiddenClass}" data-card-id="${id}" style="${isDashCardHidden(id) ? 'display:none' : ''}">
-    <div class="dcm-card-head">
-      <div class="dcm-card-icon">${icon}</div>
-      <div class="dcm-card-name">${name}</div>
-      <span class="dcm-card-curr">${curr.trim()}</span>
-      <button class="btn-icon dcm-toggle-btn" onclick="toggleDashCard('${id}')" title="Ocultar/Mostrar tarjeta">
-        ${isDashCardHidden(id) ? '🙈' : '👁️'}
-      </button>
-    </div>
-    <div class="dcm-stats">
-      <div class="dcm-stat"><div class="lbl">Ingresos</div><div class="val income">${fmtC(totalInc)}</div></div>
-      <div class="dcm-stat"><div class="lbl">Gastos</div><div class="val expense">${fmtC(totalExp)}</div></div>
-      <div class="dcm-stat"><div class="lbl">Balance</div><div class="val ${netClass}">${netStr}</div></div>
-    </div>
-    ${charts}
-  </div>`;
-}
+    function buildCard(id, icon, name, curr, data) {
+    const fmtC = v => curr + (v||0).toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const totalInc = data.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+    const totalExp = data.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+    const net = totalInc - totalExp;
+    const netClass = net >= 0 ? 'net-pos' : 'net-neg';
+    const netStr = (net>=0?'+':'') + fmtC(Math.abs(net));
+    const hidden = isDashCardHidden(id);
+    const charts = data.length === 0
+      ? `<div class="dcm-empty">Sin registros aún</div>`
+      : `<div class="dcm-charts">
+           <div class="dcm-chart-wrap">
+             <div class="dcm-chart-lbl">💚 Ingresos por cat.</div>
+             <canvas id="dcm-chart-inc-${id}"></canvas>
+           </div>
+           <div class="dcm-chart-wrap">
+             <div class="dcm-chart-lbl">🔴 Gastos por cat.</div>
+             <canvas id="dcm-chart-exp-${id}"></canvas>
+           </div>
+         </div>`;
+    return `
+    <div class="dcm-card" data-card-id="${id}" style="${hidden ? 'display:none' : ''}">
+      <div class="dcm-card-head">
+        <div class="dcm-card-icon">${icon}</div>
+        <div class="dcm-card-name">${name}</div>
+        <span class="dcm-card-curr">${curr.trim()}</span>
+        <button class="btn-icon dcm-toggle-btn" onclick="toggleDashCard('${id}')" title="Ocultar/Mostrar tarjeta">
+          ${hidden ? '🙈' : '👁️'}
+        </button>
+      </div>
+      <div class="dcm-stats">
+        <div class="dcm-stat"><div class="lbl">Ingresos</div><div class="val income">${fmtC(totalInc)}</div></div>
+        <div class="dcm-stat"><div class="lbl">Gastos</div><div class="val expense">${fmtC(totalExp)}</div></div>
+        <div class="dcm-stat"><div class="lbl">Balance</div><div class="val ${netClass}">${netStr}</div></div>
+      </div>
+      ${charts}
+    </div>`;
+  }
 
   // Construir mapa de secciones disponibles
   const _dcmSections = {
@@ -4375,6 +4496,7 @@ customMenus.forEach(m => {
       <div class="tbl-header">
         <h3>${m.icon} ${m.name} <span style="font-size:.72rem;color:var(--text2)">${m.currency}</span></h3>
         <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn btn-ghost" onclick="openMenuConfigModal(\'custom-\'+m.id)" style="font-size:.75rem;padding:3px 8px" title="Mostrar/Ocultar elementos del menú">👁️ Elementos</button>
           <span id="cm-count-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
           <button class="btn btn-ghost" onclick="exportCustomCSV(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
           <button class="btn btn-ghost" onclick="openCSVImportModal(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Importar CSV desde Excel">⬆ CSV</button>
