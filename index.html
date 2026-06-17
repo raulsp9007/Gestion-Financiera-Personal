@@ -2324,10 +2324,11 @@ function pushToDrive() {
     version: 1,
     lastUpdated: new Date().toISOString(),
     config: {
+      menuVisibility: JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}'),
       globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, hiddenNavItems:hiddenNavItems, sessionSeed:sessionSeed, budgets:budgets, savingsGoals:savingsGoals,
       colConfig: JSON.parse(localStorage.getItem('cashmap_col_config') || '{}'),
       forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder
-      menuVisibility: JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}')
+     
     },
     transactions:txs, deudas:deudas, home:homeTxs,
     deletedIds: [...new Set(deletedIds)],
