@@ -1989,6 +1989,7 @@ let forceReloadTs = 0;          // timestamp de última señal de recarga forzad
 let lastUpdatedStr = '';        // ISO string de última actualización desde Drive
 let dashCardOrder = [];         // orden de secciones en el dashboard
 let _dashOrderTemp = null;      // temp state para modal de orden dashboard
+let _dashOrderTempHidden = [];  // <--- AÑADE ESTA LÍNEA
 
 let nextId = 1;
 let nextDeudaId = 1;
@@ -5934,6 +5935,7 @@ function openDashOrderModal() {
   allKeys.forEach(k => { if (!dashCardOrder.includes(k)) dashCardOrder.push(k); });
   dashCardOrder = dashCardOrder.filter(k => allKeys.includes(k));
   _dashOrderTemp = [...dashCardOrder];
+  _dashOrderTempHidden = [...getHiddenDashCards()];  // Cargar las ocultas actuales
   _renderDashOrderList();
   document.getElementById('dash-order-modal').classList.add('open');
 }
@@ -5955,7 +5957,15 @@ function _renderDashOrderList() {
       <button onclick="_dashMove(${i},1)"  ${i===_dashOrderTemp.length-1?'disabled':''} style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 9px;cursor:pointer;color:var(--text2);font-size:.85rem">▼</button>
     </div>`).join('');
 }
-
+function _dashToggleVisibility(key) {
+  const idx = _dashOrderTempHidden.indexOf(key);
+  if (idx >= 0) {
+    _dashOrderTempHidden.splice(idx, 1);  // Quitar de ocultas → mostrarla
+  } else {
+    _dashOrderTempHidden.push(key);        // Añadir a ocultas → esconderla
+  }
+  _renderDashOrderList();  // Refrescar la lista del modal
+}
 function _dashMove(idx, dir) {
   const ni = idx + dir;
   if (ni < 0 || ni >= _dashOrderTemp.length) return;
