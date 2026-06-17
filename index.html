@@ -174,6 +174,29 @@
     padding-top:calc(52px + env(safe-area-inset-top));
   }
 
+  /* Window Controls Overlay (PWA desktop — reclaims OS title bar) */
+  @media (display-mode: window-controls-overlay) {
+    #sidebar .brand {
+      padding: 0 16px;
+      height: env(titlebar-area-height, 40px);
+      display: flex;
+      align-items: center;
+      -webkit-app-region: drag;
+      app-region: drag;
+    }
+    #sidebar .brand p { display: none; }
+    #sidebar .brand h1 { font-size: .95rem; }
+    #topbar {
+      height: env(titlebar-area-height, 40px);
+      -webkit-app-region: drag;
+      app-region: drag;
+    }
+    #topbar button,
+    #topbar input,
+    #topbar #global-search-wrap,
+    #topbar-user { -webkit-app-region: no-drag; app-region: no-drag; }
+  }
+
   /* Indicador de sync offline */
   #sync-badge.offline{background:rgba(245,158,11,.2);color:#f59e0b;border-color:#f59e0b}
   #sync-badge.syncing{background:rgba(59,130,246,.2);color:#3b82f6;border-color:#3b82f6}
@@ -5103,6 +5126,8 @@ function initPWA() {
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
   if (isStandalone) document.body.classList.add('pwa-standalone');
+  const isWCO = window.matchMedia('(display-mode: window-controls-overlay)').matches;
+  if (isWCO) document.body.classList.add('pwa-wco');
 
   // Inyectar manifest con iconos generados por canvas
   try {
@@ -5114,6 +5139,7 @@ function initPWA() {
       description: 'Gestión financiera personal — transacciones, deudas y hogar',
       start_url: location.href.split('?')[0],
       scope: location.href.split('?')[0],
+      display_override: ['window-controls-overlay', 'standalone'],
       display: 'standalone',
       background_color: '#0f172a',
       theme_color: '#0f172a',
