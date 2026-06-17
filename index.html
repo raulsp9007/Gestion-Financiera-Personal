@@ -2300,7 +2300,7 @@ function initFromDrive(data) {
     if (c.forceReloadTs) forceReloadTs = c.forceReloadTs;
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
     if (c.menuVisibility) {
-      localStorage.setItem(\'cashmap_menu_visibility\', JSON.stringify(c.menuVisibility));
+      localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
     }
     if (c.menuVisibility) {
       localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
@@ -2586,10 +2586,10 @@ function applyRemoteData(data) {
     }
     if (c.budgets) budgets = c.budgets;
     if (c.savingsGoals) { savingsGoals = c.savingsGoals; if (savingsGoals.length) _nextGoalId = Math.max(...savingsGoals.map(g=>g.id))+1; }
-    if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
-    if (c.menuVisibility) {
-      localStorage.setItem(\'cashmap_menu_visibility\', JSON.stringify(c.menuVisibility));
-    }
+   if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
+if (c.menuVisibility) {
+  localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
+}
   }
   if (data.deletedIds) {
     // No importar tombstones globales para IDs que existen en memoria local (evita corrupción de otros dispositivos)
