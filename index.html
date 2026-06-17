@@ -2149,7 +2149,7 @@ function mergeData(local, remote) {
   const mergeArr = (loc, rem) => {
     const map = {};
     (rem||[]).forEach(t => { if (!allDel.has(t.id)) map[t.id] = t; });
-    (loc||[]).forEach(t => { if (!allDel.has(t.id)) map[t.id] = t; }); // local gana mismo id
+    (loc||[]).forEach(t => { map[t.id] = t; }); // local siempre gana, jamás filtrado por tombstones remotos
     return Object.values(map);
   };
   // Merge deletedCustomRecords: unión de ambos lados
@@ -2365,7 +2365,12 @@ function applyRemoteData(data) {
     if (c.savingsGoals) { savingsGoals = c.savingsGoals; if (savingsGoals.length) _nextGoalId = Math.max(...savingsGoals.map(g=>g.id))+1; }
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
   }
-  if (data.deletedIds) deletedIds = [...new Set([...deletedIds, ...data.deletedIds])];
+  if (data.deletedIds) {
+    // No importar tombstones globales para IDs que existen en memoria local (evita corrupción de otros dispositivos)
+    const liveGlobalIds = new Set([...txs.map(t=>t.id), ...homeTxs.map(t=>t.id), ...deudas.map(t=>t.id)]);
+    const safeDIds = data.deletedIds.filter(id => !liveGlobalIds.has(id));
+    deletedIds = [...new Set([...deletedIds, ...safeDIds])];
+  }
   if (data.deletedCustomRecords) {
     Object.entries(data.deletedCustomRecords).forEach(([mid, ids]) => {
       if (!deletedCustomRecords[mid]) deletedCustomRecords[mid] = [];
@@ -2379,7 +2384,15 @@ function applyRemoteData(data) {
   if (data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
   if (data.lastUpdated) lastUpdatedStr = data.lastUpdated;
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    // Guardar estado en memoria (post-merge), no el dato crudo de Drive
+    const _lsPayload = {
+      version:1, transactions:txs, deudas, home:homeTxs,
+      config:{globalCats,homeCurr:HOME_CURR,users,customMenus:customMenus.map(m=>{const{charts,...r}=m;return r;}),
+        navOrder,sessionSeed,budgets,savingsGoals,
+        colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs,dashCardOrder},
+      deletedIds:[...deletedIds], deletedCustomRecords
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(_lsPayload));
     localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
   } catch(e) {}
   _applyingRemote = false;
