@@ -6375,39 +6375,89 @@ function renderCSVPreview(records) {
   const info = document.getElementById('csv-preview-info');
   const head = document.getElementById('csv-preview-head');
   const body = document.getElementById('csv-preview-body');
-  const btn  = document.getElementById('csv-import-btn');
 
   if (!records.length) {
     info.textContent = '⚠️ No se encontraron registros válidos en el archivo.';
     head.innerHTML = ''; body.innerHTML = '';
     wrap.style.display = 'block';
-    btn.style.display = 'none';
+    document.getElementById('csv-import-btn').style.display = 'none';
     return;
   }
 
-  const inc = records.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-  const exp = records.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-  info.innerHTML = `<strong>${records.length}</strong> registros — Ingresos: <span style="color:var(--green)">$${inc.toFixed(2)}</span> · Gastos: <span style="color:var(--red)">$${exp.toFixed(2)}</span>`;
-
   const m = customMenus.find(x => x.id === _csvImportMenuId);
-  const fmt = v => (m?.currency || '$') + v.toFixed(2);
+  const existingData = m?.data || [];
 
-  head.innerHTML = '<tr><th>Fecha</th><th>Monto</th><th>Tipo</th><th>Descripción</th><th>Categoría</th></tr>';
-  body.innerHTML = records.map(r =>
-    `<tr><td>${r.date}</td>
-     <td class="${r.type === 'income' ? 'inc' : 'exp'}">${r.type === 'expense' ? '-' : '+'}${fmt(r.amount)}</td>
-     <td>${r.type === 'income' ? '↑ Ingreso' : '↓ Gasto'}</td>
-     <td>${r.description}</td>
-     <td>${r.category}</td></tr>`
-  ).join('');
+  function isDup(r) {
+    return existingData.some(x => x.date === r.date && x.type === r.type && Math.abs(x.amount - r.amount) < 0.01);
+  }
+
+  function catOpts(type, selected) {
+    const cats = type === 'income' ? globalCats.inc : globalCats.exp;
+    return Object.entries(cats).map(([k,v]) =>
+      `<option value="${k}"${k === selected ? ' selected' : ''}>${v.label}</option>`
+    ).join('');
+  }
+
+  const inc  = records.filter(r => r.type === 'income').reduce((s,r) => s + r.amount, 0);
+  const exp  = records.filter(r => r.type === 'expense').reduce((s,r) => s + r.amount, 0);
+  const dups = records.filter(r => isDup(r)).length;
+
+  info.innerHTML = `<strong>${records.length}</strong> registros · `
+    + `<span style="color:var(--green)">Ingresos: $${inc.toFixed(2)}</span> · `
+    + `<span style="color:var(--red)">Gastos: $${exp.toFixed(2)}</span>`
+    + (dups ? ` · <span style="color:#fb923c">${dups} posible${dups!==1?'s':''} duplicado${dups!==1?'s':''}</span>` : '');
+
+  const inS = 'background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 5px;font-size:.75rem';
+
+  head.innerHTML = `<tr>
+    <th style="width:28px">
+      <input type="checkbox" id="csv-chk-all" checked title="Sel/Desel todos"
+        onchange="document.querySelectorAll('.csv-row-chk').forEach(c=>c.checked=this.checked);updateCSVImportCount()"
+        style="width:auto;cursor:pointer">
+    </th>
+    <th>Fecha</th><th>Monto</th><th>Tipo</th><th>Descripción</th><th>Categoría</th><th>Estado</th>
+  </tr>`;
+
+  body.innerHTML = records.map((r, i) => {
+    const dup = isDup(r);
+    const badge = dup
+      ? `<span style="font-size:.7rem;padding:2px 7px;border-radius:10px;background:rgba(251,146,60,.15);color:#fb923c;font-weight:600;white-space:nowrap">Ya existe</span>`
+      : `<span style="font-size:.7rem;padding:2px 7px;border-radius:10px;background:rgba(34,197,94,.12);color:var(--green);font-weight:600;white-space:nowrap">Nuevo</span>`;
+    const safeDesc = r.description.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    return `<tr data-idx="${i}">
+      <td style="text-align:center"><input type="checkbox" class="csv-row-chk" ${dup ? '' : 'checked'} onchange="updateCSVImportCount()" style="width:auto;cursor:pointer"></td>
+      <td><input type="date" class="csv-edit-date" value="${r.date}" style="${inS};width:auto"></td>
+      <td><input type="number" class="csv-edit-amt" value="${r.amount.toFixed(2)}" min="0" step="0.01" style="${inS};width:72px"></td>
+      <td><select class="csv-edit-type" onchange="csvUpdateRowCat(this)" style="${inS}">
+        <option value="income"${r.type==='income'?' selected':''}>↑ Ingreso</option>
+        <option value="expense"${r.type==='expense'?' selected':''}>↓ Gasto</option>
+      </select></td>
+      <td><input type="text" class="csv-edit-desc" value="${safeDesc}" style="${inS};min-width:110px"></td>
+      <td><select class="csv-edit-cat" style="${inS}">${catOpts(r.type, r.category)}</select></td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
 
   wrap.style.display = 'block';
-  btn.textContent = `⬆ Importar ${records.length} registros`;
-  btn.style.display = 'inline-flex';
+  updateCSVImportCount();
+}
+
+function updateCSVImportCount() {
+  const checked = document.querySelectorAll('.csv-row-chk:checked').length;
+  const btn = document.getElementById('csv-import-btn');
+  btn.style.display = checked ? 'inline-flex' : 'none';
+  if (checked) btn.textContent = `⬆ Importar ${checked} registro${checked !== 1 ? 's' : ''}`;
+}
+
+function csvUpdateRowCat(typeEl) {
+  const row = typeEl.closest('tr');
+  const catSel = row.querySelector('.csv-edit-cat');
+  const cats = typeEl.value === 'income' ? globalCats.inc : globalCats.exp;
+  catSel.innerHTML = Object.entries(cats).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('');
 }
 
 function doCSVImport() {
-  if (!_csvParsedRecords.length || _csvImportMenuId === null) return;
+  if (_csvImportMenuId === null) return;
   const m = customMenus.find(x => x.id === _csvImportMenuId);
   if (!m) return;
 
@@ -6419,15 +6469,33 @@ function doCSVImport() {
     m.data = (m.data || []).filter(r => !r.date.startsWith(prefix));
   }
 
-  if (!m.nextDataId) m.nextDataId = (m.data.reduce((mx,x) => Math.max(mx, x.id), 0) + 1);
-  _csvParsedRecords.forEach(r => {
-    m.data.push({ id: m.nextDataId++, ...r, attachments: [] });
+  const rows = document.querySelectorAll('#csv-preview-body tr');
+  const toImport = [];
+  rows.forEach(row => {
+    const chk = row.querySelector('.csv-row-chk');
+    if (!chk?.checked) return;
+    const amount = parseFloat(row.querySelector('.csv-edit-amt').value) || 0;
+    if (amount <= 0) return;
+    toImport.push({
+      date:        row.querySelector('.csv-edit-date').value,
+      amount,
+      type:        row.querySelector('.csv-edit-type').value,
+      category:    row.querySelector('.csv-edit-cat').value,
+      description: row.querySelector('.csv-edit-desc').value.trim() || '-',
+      notes:       '',
+      attachments: []
+    });
   });
+
+  if (!toImport.length) { showToast('No hay registros seleccionados', 'var(--red)'); return; }
+
+  if (!m.nextDataId) m.nextDataId = (m.data || []).reduce((mx,x) => Math.max(mx, x.id), 0) + 1;
+  toImport.forEach(r => { m.data.push({ id: m.nextDataId++, ...r }); });
 
   closeCsvImportModal();
   renderCustomMenuView(_csvImportMenuId);
   scheduleSave();
-  showToast(`✅ ${_csvParsedRecords.length} registros importados`);
+  showToast(`✅ ${toImport.length} registros importados`);
   _csvParsedRecords = [];
 }
 
