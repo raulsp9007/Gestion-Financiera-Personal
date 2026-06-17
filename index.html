@@ -1108,59 +1108,60 @@
     </div>
 
     <!-- ===== HOME BILLINGS ===== -->
-    <div id="view-home" class="view">
-      <!-- Tabs de meses -->
-      <div class="month-tabs" id="home-month-tabs" style="margin-bottom:14px"></div>
+<div id="view-home" class="view">
+  <!-- Tabs de meses -->
+  <div class="month-tabs" id="home-month-tabs" style="margin-bottom:14px"></div>
 
-      <div class="cards" id="home-cards"></div>
-      <div class="weekly-wrap">
-        <h4>Gastos por semana</h4>
-        <canvas id="chart-home-weekly" style="max-height:160px"></canvas>
-      </div>
-      <div class="charts">
-        <div class="chart-box"><h3>Ingresos vs Gastos (hogar)</h3><canvas id="chart-home-monthly"></canvas></div>
-        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal('home')" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="chart-home-cat"></canvas></div>
-      </div>
-      <button class="filter-toggle-btn" onclick="toggleFilters('home-filters','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
-        🔍 Buscar y filtrar
-        <span class="ft-count" id="home-filter-count"></span>
-        <span style="margin-left:auto;font-size:.8rem" id="home-filter-arrow">▾</span>
-      </button>
-      <div class="filters" id="home-filters">
-        <input type="text" id="hf-search" placeholder="🔍 Buscar descripción o notas..." oninput="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
-        <select id="hf-type" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
-          <option value="">Todos los tipos</option>
-          <option value="income">💚 Ingresos</option>
-          <option value="expense">🔴 Gastos</option>
-        </select>
-        <select id="hf-cat" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
-          <option value="">Todas las categorías</option>
-        </select>
-        <select id="hf-month" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
-          <option value="">Todos los meses</option>
-          <option value="01">Enero</option><option value="02">Febrero</option>
-          <option value="03">Marzo</option><option value="04">Abril</option>
-          <option value="05">Mayo</option><option value="06">Junio</option>
-          <option value="07">Julio</option><option value="08">Agosto</option>
-          <option value="09">Septiembre</option><option value="10">Octubre</option>
-          <option value="11">Noviembre</option><option value="12">Diciembre</option>
-        </select>
-        <input type="date" id="hf-date-from" title="Fecha desde" oninput="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')" style="font-size:.82rem">
-        <input type="date" id="hf-date-to"   title="Fecha hasta" oninput="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')" style="font-size:.82rem">
-      </div>
-      <div class="tbl-wrap">
-        <div class="tbl-header">
-          <h3>🏠 Registro del hogar <span class="home-curr" id="home-curr-label"></span></h3>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span id="home-count" style="font-size:.78rem;color:var(--text2)"></span>
-            <button class="btn btn-ghost" onclick="exportHomeCSV()" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
-            <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('home')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
-          </div>
-        </div>
-        <div class="tbl-scroll"><table><thead id="home-thead"></thead>
-        <tbody id="home-tbody"></tbody></table></div>
+  <div class="cards" id="home-cards"></div>
+  <div class="weekly-wrap">
+    <h4>Gastos por semana</h4>
+    <canvas id="chart-home-weekly" style="max-height:160px"></canvas>
+  </div>
+  <div class="charts">
+    <div class="chart-box" id="home-monthly-chart-box"><h3>Ingresos vs Gastos (hogar)</h3><canvas id="chart-home-monthly"></canvas></div>
+    <div class="chart-box" id="home-category-chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal('home')" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="chart-home-cat"></canvas></div>
+  </div>
+  <button class="filter-toggle-btn" onclick="toggleFilters('home-filters','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
+    🔍 Buscar y filtrar
+    <span class="ft-count" id="home-filter-count"></span>
+    <span style="margin-left:auto;font-size:.8rem" id="home-filter-arrow">▾</span>
+  </button>
+  <div class="filters" id="home-filters">
+    <input type="text" id="hf-search" placeholder="🔍 Buscar descripción o notas..." oninput="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
+    <select id="hf-type" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
+      <option value="">Todos los tipos</option>
+      <option value="income">💚 Ingresos</option>
+      <option value="expense">🔴 Gastos</option>
+    </select>
+    <select id="hf-cat" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
+      <option value="">Todas las categorías</option>
+    </select>
+    <select id="hf-month" onchange="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')">
+      <option value="">Todos los meses</option>
+      <option value="01">Enero</option><option value="02">Febrero</option>
+      <option value="03">Marzo</option><option value="04">Abril</option>
+      <option value="05">Mayo</option><option value="06">Junio</option>
+      <option value="07">Julio</option><option value="08">Agosto</option>
+      <option value="09">Septiembre</option><option value="10">Octubre</option>
+      <option value="11">Noviembre</option><option value="12">Diciembre</option>
+    </select>
+    <input type="date" id="hf-date-from" title="Fecha desde" oninput="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')" style="font-size:.82rem">
+    <input type="date" id="hf-date-to"   title="Fecha hasta" oninput="renderHome();updateFilterCount('home-filter-count','hf-search','hf-type','hf-cat','hf-month','hf-date-from','hf-date-to')" style="font-size:.82rem">
+  </div>
+  <div class="tbl-wrap">
+    <div class="tbl-header">
+      <h3>🏠 Registro del hogar <span class="home-curr" id="home-curr-label"></span></h3>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="home-count" style="font-size:.78rem;color:var(--text2)"></span>
+        <button class="btn btn-ghost" onclick="exportHomeCSV()" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
+        <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('home')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
+        <button class="btn btn-ghost" onclick="openMenuConfigModal('home')" style="font-size:.75rem;padding:3px 8px" title="Mostrar/Ocultar elementos del menú">👁️ Elementos</button>
       </div>
     </div>
+    <div class="tbl-scroll"><table><thead id="home-thead"></thead>
+    <tbody id="home-tbody"></tbody></table></div>
+  </div>
+</div>
 
     <!-- Menús personalizados — inyectados dinámicamente -->
     <div id="custom-views-slot"></div>
@@ -1899,6 +1900,72 @@ function toggleDashCard(id) {
   renderDashCustomMenus();
   showToast(`Tarjeta ${idx >= 0 ? 'mostrada' : 'oculta'}`, 'var(--acc)');
 }
+// ============================================================
+// MENU ELEMENTS VISIBILITY (weekly, monthly chart, category chart)
+// ============================================================
+function getMenuVisibility(menuId) {
+  try {
+    const all = JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}');
+    return all[menuId] || { weekly: true, monthlyChart: true, categoryChart: true };
+  } catch(e) { return { weekly: true, monthlyChart: true, categoryChart: true }; }
+}
+
+function setMenuVisibility(menuId, visibility) {
+  const all = JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}');
+  all[menuId] = visibility;
+  localStorage.setItem('cashmap_menu_visibility', JSON.stringify(all));
+}
+
+function toggleMenuVisibility(menuId, key) {
+  const vis = getMenuVisibility(menuId);
+  vis[key] = !vis[key];
+  setMenuVisibility(menuId, vis);
+  // Re-renderizar la vista correspondiente
+  if (menuId === 'home') {
+    renderHome();
+  } else {
+    const id = parseInt(menuId.replace('custom-',''));
+    if (!isNaN(id)) renderCustomMenuView(id);
+  }
+  // Actualizar el modal si está abierto
+  const modal = document.getElementById('menu-config-modal');
+  if (modal && modal.classList.contains('open')) {
+    renderMenuConfigModal(menuId);
+  }
+}
+//
+ let _menuConfigMenuId = null;
+
+function openMenuConfigModal(menuId) {
+  _menuConfigMenuId = menuId;
+  renderMenuConfigModal(menuId);
+  document.getElementById('menu-config-modal').classList.add('open');
+}
+
+function closeMenuConfigModal() {
+  document.getElementById('menu-config-modal').classList.remove('open');
+  _menuConfigMenuId = null;
+}
+
+function renderMenuConfigModal(menuId) {
+  const vis = getMenuVisibility(menuId);
+  const labelMap = {
+    weekly: '📊 Gastos por semana',
+    monthlyChart: '📈 Ingresos vs Gastos',
+    categoryChart: '🍩 Gastos por categoría'
+  };
+  const body = document.getElementById('menu-config-body');
+  body.innerHTML = Object.keys(vis).map(key => {
+    const isVisible = vis[key];
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <span style="flex:1;font-size:.9rem">${labelMap[key]}</span>
+      <button onclick="toggleMenuVisibility('${menuId}','${key}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:.85rem;color:${isVisible?'var(--green)':'var(--red)'}">
+        ${isVisible ? '👁️ Visible' : '🙈 Oculto'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
 // COL_DEFS: render functions for each column. 'actions' is always fixed-last, not in defs.
 // fn signatures: history/home/deudas receive the row object; custom receives (t, curr).
 function recBadge(t) {
@@ -2118,6 +2185,10 @@ function initFromDrive(data) {
     if (c.forceReloadTs) forceReloadTs = c.forceReloadTs;
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
   }
+  if (c.menuVisibility) {
+  localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
+ }
+ 
   if (data && data.deletedIds) {
     // No registrar como tombstone IDs que existen en los datos recién cargados
     const liveLoaded = new Set([...txs.map(t=>t.id), ...homeTxs.map(t=>t.id), ...deudas.map(t=>t.id)]);
@@ -2256,6 +2327,7 @@ function pushToDrive() {
       globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, hiddenNavItems:hiddenNavItems, sessionSeed:sessionSeed, budgets:budgets, savingsGoals:savingsGoals,
       colConfig: JSON.parse(localStorage.getItem('cashmap_col_config') || '{}'),
       forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder
+      menuVisibility: JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}')
     },
     transactions:txs, deudas:deudas, home:homeTxs,
     deletedIds: [...new Set(deletedIds)],
@@ -3302,6 +3374,10 @@ function renderHome() {
     <div class="card green"><div class="label">Ingresos</div><div class="value">${fmtH(inc)}</div>${curMM?renderCmpDelta(inc,prevInc,_hPrevM):'<div class="sub">'+periodLabel+'</div>'}</div>
     <div class="card red"><div class="label">Gastos</div><div class="value">${fmtH(exp)}</div>${curMM?renderCmpDelta(exp,prevExp,_hPrevM,true):'<div class="sub">'+periodLabel+'</div>'}</div>
     <div class="card ${net>=0?'blue':'red'}"><div class="label">Balance</div><div class="value" style="font-size:1.4rem">${net>=0?'+':''}${fmtH(net)}</div><div class="sub">${periodLabel}</div></div>
+    const vis = getMenuVisibility('home');
+    document.querySelector('#view-home .weekly-wrap').style.display = vis.weekly ? '' : 'none';
+    document.getElementById('home-monthly-chart-box').style.display = vis.monthlyChart ? '' : 'none';
+    document.getElementById('home-category-chart-box').style.display = vis.categoryChart ? '' : 'none';
     ${_hFourthCard}
   `;
 
@@ -4260,67 +4336,61 @@ function buildSidebarNav() {
 // CUSTOM MENUS — BUILD & RENDER
 // ============================================================
 let _customMenusSnapshot = '';
-function buildCustomMenuViews() {
-  const slot = document.getElementById('custom-views-slot');
-  const snapshot = JSON.stringify(customMenus.map(({charts,...r}) => r));
-  if (snapshot === _customMenusSnapshot && slot.children.length === customMenus.length) return;
-  _customMenusSnapshot = snapshot;
-  slot.innerHTML = '';
-
-  customMenus.forEach(m => {
-    // Inyectar vista HTML
-    const div = document.createElement('div');
-    div.id = 'view-custom-' + m.id;
-    div.className = 'view';
-    div.innerHTML = `
-      <div class="month-tabs" id="cm-month-tabs-${m.id}" style="margin-bottom:14px"></div>
-      <div class="cards" id="cm-cards-${m.id}"></div>
-      <div class="weekly-wrap">
-        <h4>Gastos por semana</h4>
-        <canvas id="cm-chart-weekly-${m.id}" style="max-height:160px"></canvas>
-      </div>
-      <div class="charts">
-        <div class="chart-box"><h3>Ingresos vs Gastos</h3><canvas id="cm-chart-monthly-${m.id}"></canvas></div>
-        <div class="chart-box"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal('custom',${m.id})" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="cm-chart-cat-${m.id}"></canvas></div>
-      </div>
-      <button class="filter-toggle-btn" onclick="toggleFilters('cmf-filters-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
-        🔍 Buscar y filtrar
-        <span class="ft-count" id="cmf-filter-count-${m.id}"></span>
-        <span style="margin-left:auto;font-size:.8rem" id="cmf-filter-arrow-${m.id}">▾</span>
-      </button>
-      <div class="filters" id="cmf-filters-${m.id}">
-        <input type="text" id="cmf-search-${m.id}" placeholder="🔍 Buscar..." oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
-        <select id="cmf-type-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
-          <option value="">Todos</option><option value="income">Ingresos</option><option value="expense">Gastos</option>
-        </select>
-        <select id="cmf-cat-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
-          <option value="">Todas las categorías</option>
-        </select>
-        <select id="cmf-month-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
-          <option value="">Todos los meses</option>
-          ${['01','02','03','04','05','06','07','08','09','10','11','12'].map(mo=>`<option value="${mo}">${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(mo)-1]}</option>`).join('')}
-        </select>
-        <input type="date" id="cmf-date-from-${m.id}" title="Fecha desde" oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')" style="font-size:.82rem">
-        <input type="date" id="cmf-date-to-${m.id}"   title="Fecha hasta" oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')" style="font-size:.82rem">
-      </div>
-      <!-- Registros -->
-      <div class="tbl-wrap">
-        <div class="tbl-header">
-          <h3>${m.icon} ${m.name} <span style="font-size:.72rem;color:var(--text2)">${m.currency}</span></h3>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span id="cm-count-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
-            <button class="btn btn-ghost" onclick="exportCustomCSV(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
-            <button class="btn btn-ghost" onclick="openCSVImportModal(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Importar CSV desde Excel">⬆ CSV</button>
-            <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('custom')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
-          </div>
+customMenus.forEach(m => {
+  // Inyectar vista HTML
+  const div = document.createElement('div');
+  div.id = 'view-custom-' + m.id;
+  div.className = 'view';
+  div.innerHTML = `
+    <div class="month-tabs" id="cm-month-tabs-${m.id}" style="margin-bottom:14px"></div>
+    <div class="cards" id="cm-cards-${m.id}"></div>
+    <div class="weekly-wrap">
+      <h4>Gastos por semana</h4>
+      <canvas id="cm-chart-weekly-${m.id}" style="max-height:160px"></canvas>
+    </div>
+    <div class="charts">
+      <div class="chart-box" id="cm-monthly-chart-box-${m.id}"><h3>Ingresos vs Gastos</h3><canvas id="cm-chart-monthly-${m.id}"></canvas></div>
+      <div class="chart-box" id="cm-category-chart-box-${m.id}"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">Gastos por categoría</h3><button onclick="openCatColorsModal('custom',${m.id})" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;cursor:pointer;color:var(--text2)">🎨 Colores</button></div><canvas id="cm-chart-cat-${m.id}"></canvas></div>
+    </div>
+    <button class="filter-toggle-btn" onclick="toggleFilters('cmf-filters-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
+      🔍 Buscar y filtrar
+      <span class="ft-count" id="cmf-filter-count-${m.id}"></span>
+      <span style="margin-left:auto;font-size:.8rem" id="cmf-filter-arrow-${m.id}">▾</span>
+    </button>
+    <div class="filters" id="cmf-filters-${m.id}">
+      <input type="text" id="cmf-search-${m.id}" placeholder="🔍 Buscar..." oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
+      <select id="cmf-type-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
+        <option value="">Todos</option><option value="income">Ingresos</option><option value="expense">Gastos</option>
+      </select>
+      <select id="cmf-cat-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
+        <option value="">Todas las categorías</option>
+      </select>
+      <select id="cmf-month-${m.id}" onchange="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')">
+        <option value="">Todos los meses</option>
+        ${['01','02','03','04','05','06','07','08','09','10','11','12'].map(mo=>`<option value="${mo}">${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(mo)-1]}</option>`).join('')}
+      </select>
+      <input type="date" id="cmf-date-from-${m.id}" title="Fecha desde" oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')" style="font-size:.82rem">
+      <input type="date" id="cmf-date-to-${m.id}"   title="Fecha hasta" oninput="renderCustomMenuView(${m.id});updateFilterCount('cmf-filter-count-${m.id}','cmf-search-${m.id}','cmf-type-${m.id}','cmf-cat-${m.id}','cmf-month-${m.id}','cmf-date-from-${m.id}','cmf-date-to-${m.id}')" style="font-size:.82rem">
+    </div>
+    <!-- Registros -->
+    <div class="tbl-wrap">
+      <div class="tbl-header">
+        <h3>${m.icon} ${m.name} <span style="font-size:.72rem;color:var(--text2)">${m.currency}</span></h3>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="cm-count-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
+          <button class="btn btn-ghost" onclick="exportCustomCSV(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
+          <button class="btn btn-ghost" onclick="openCSVImportModal(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Importar CSV desde Excel">⬆ CSV</button>
+          <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('custom')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
+          <button class="btn btn-ghost" onclick="openMenuConfigModal('custom-${m.id}')" style="font-size:.75rem;padding:3px 8px" title="Mostrar/Ocultar elementos del menú">👁️ Elementos</button>
         </div>
-        <div class="tbl-scroll"><table><thead id="cm-thead-${m.id}"></thead><tbody id="cm-tbody-${m.id}"></tbody></table></div>
-      </div>`;
-    slot.appendChild(div);
+      </div>
+      <div class="tbl-scroll"><table><thead id="cm-thead-${m.id}"></thead><tbody id="cm-tbody-${m.id}"></tbody></table></div>
+    </div>`;
+  slot.appendChild(div);
 
-    // Init chart holders
-    if (!customCharts[m.id]) customCharts[m.id] = {monthly:null, cat:null, weekly:null};
-  });
+  // Init chart holders
+  if (!customCharts[m.id]) customCharts[m.id] = {monthly:null, cat:null, weekly:null};
+});
 }
 
 function buildMoreDrawer() {
@@ -4472,6 +4542,10 @@ function renderCustomMenuView(menuId) {
   }
 
   document.getElementById('cm-cards-'+menuId).innerHTML = `
+    const vis = getMenuVisibility('custom-'+menuId);
+    document.querySelector('#view-custom-'+menuId+' .weekly-wrap').style.display = vis.weekly ? '' : 'none';
+    document.getElementById('cm-monthly-chart-box-'+menuId).style.display = vis.monthlyChart ? '' : 'none';
+    document.getElementById('cm-category-chart-box-'+menuId).style.display = vis.categoryChart ? '' : 'none';
     <div class="card green"><div class="label">Ingresos</div><div class="value">${fmt(inc)}</div>${curMM?renderCmpDelta(inc,prevInc,_cmPrevM):'<div class="sub">'+periodLabel+'</div>'}</div>
     <div class="card red"><div class="label">Gastos</div><div class="value">${fmt(exp)}</div>${curMM?renderCmpDelta(exp,prevExp,_cmPrevM,true):'<div class="sub">'+periodLabel+'</div>'}</div>
     <div class="card ${net>=0?'blue':'red'}"><div class="label">Balance</div><div class="value" style="font-size:1.35rem">${net>=0?'+':''}${fmt(Math.abs(net))}</div><div class="sub">${periodLabel}</div></div>
@@ -6749,6 +6823,21 @@ function _attachOnClose() {
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeCsvImportModal()">Cancelar</button>
       <button class="btn btn-primary" id="csv-import-btn" onclick="doCSVImport()" style="display:none">⬆ Importar</button>
+    </div>
+  </div>
+</div>
+<!-- Modal de configuración de visibilidad de elementos del menú -->
+<div class="modal-overlay" id="menu-config-modal">
+  <div class="modal" style="width:400px;max-width:96vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <h3 id="menu-config-title" style="margin:0">👁️ Elementos del menú</h3>
+      <button class="btn btn-ghost" onclick="closeMenuConfigModal()" style="padding:4px 10px">✕</button>
+    </div>
+    <div id="menu-config-body">
+      <!-- Se llenará dinámicamente -->
+    </div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeMenuConfigModal()">Cerrar</button>
     </div>
   </div>
 </div>
