@@ -2184,11 +2184,10 @@ function initFromDrive(data) {
       localStorage.setItem('cashmap_col_config', JSON.stringify(c.colConfig));
     if (c.forceReloadTs) forceReloadTs = c.forceReloadTs;
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
+    if (c.menuVisibility) {
+      localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
   }
-  if (c.menuVisibility) {
-  localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
- }
- 
+  } 
   if (data && data.deletedIds) {
     // No registrar como tombstone IDs que existen en los datos recién cargados
     const liveLoaded = new Set([...txs.map(t=>t.id), ...homeTxs.map(t=>t.id), ...deudas.map(t=>t.id)]);
@@ -2324,11 +2323,9 @@ function pushToDrive() {
     version: 1,
     lastUpdated: new Date().toISOString(),
     config: {
-      menuVisibility: JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}'),
       globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, hiddenNavItems:hiddenNavItems, sessionSeed:sessionSeed, budgets:budgets, savingsGoals:savingsGoals,
       colConfig: JSON.parse(localStorage.getItem('cashmap_col_config') || '{}'),
-      forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder
-     
+      forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder, menuVisibility: JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}')     
     },
     transactions:txs, deudas:deudas, home:homeTxs,
     deletedIds: [...new Set(deletedIds)],
