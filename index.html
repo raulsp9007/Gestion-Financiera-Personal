@@ -1870,6 +1870,35 @@ const STATIC_NAV = {
   balance:   { label: 'Balance',  ico: '📈', view: 'view-balance'   },
 };
 // ── Column configuration per table ──────────────────────────────────────────
+ // ============================================================
+// DASHBOARD CARD VISIBILITY (localStorage)
+// ============================================================
+function getHiddenDashCards() {
+  try {
+    return JSON.parse(localStorage.getItem('cashmap_hidden_dash_cards') || '[]');
+  } catch(e) { return []; }
+}
+
+function setHiddenDashCards(hiddenList) {
+  localStorage.setItem('cashmap_hidden_dash_cards', JSON.stringify(hiddenList));
+}
+
+function isDashCardHidden(id) {
+  return getHiddenDashCards().includes(id);
+}
+
+function toggleDashCard(id) {
+  let hidden = getHiddenDashCards();
+  const idx = hidden.indexOf(id);
+  if (idx >= 0) {
+    hidden.splice(idx, 1);
+  } else {
+    hidden.push(id);
+  }
+  setHiddenDashCards(hidden);
+  renderDashCustomMenus();
+  showToast(`Tarjeta ${idx >= 0 ? 'mostrada' : 'oculta'}`, 'var(--acc)');
+}
 // COL_DEFS: render functions for each column. 'actions' is always fixed-last, not in defs.
 // fn signatures: history/home/deudas receive the row object; custom receives (t, curr).
 function recBadge(t) {
