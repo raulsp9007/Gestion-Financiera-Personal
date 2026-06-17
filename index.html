@@ -6380,10 +6380,45 @@ function handleCSVFile(input) {
     const month = document.getElementById('csv-month').value;
     const catInc = document.getElementById('csv-cat-inc').value;
     const catExp = document.getElementById('csv-cat-exp').value;
-    _csvParsedRecords = parseZelleCSV(e.target.result, year, month, catInc, catExp);
+    _csvParsedRecords = parseCustomMenuCSV(e.target.result, year, month, catInc, catExp);
     renderCSVPreview(_csvParsedRecords);
   };
   reader.readAsText(file, 'UTF-8');
+}
+
+function parseCustomMenuCSV(csvText, year, month, catInc, catExp) {
+  const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+  if (lines.length < 2) return [];
+  // Detectar formato: CashMap export (header tiene "Fecha" y "Tipo") vs extracto Zelle (col0 = día numérico)
+  const header = lines[0].toLowerCase().replace(/"/g, '');
+  if (header.includes('fecha') && header.includes('tipo')) {
+    // Formato CashMap: Fecha,Monto,Tipo,Categoría,Descripción,Notas,Recurrencia
+    const records = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = splitCSVLine(lines[i]);
+      if (!cols || cols.length < 3) continue;
+      const dateRaw = (cols[0] || '').trim();
+      const amtRaw  = (cols[1] || '').trim();
+      const typeRaw = (cols[2] || '').trim().toLowerCase();
+      const desc    = (cols[4] || '').trim();
+      const notes   = (cols[5] || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) continue;
+      const amount = parseFloat(amtRaw.replace(',', '.'));
+      if (isNaN(amount) || amount === 0) continue;
+      const isIncome = typeRaw.startsWith('ingreso') || amount > 0;
+      records.push({
+        date:        dateRaw,
+        amount:      Math.abs(amount),
+        type:        isIncome ? 'income' : 'expense',
+        category:    isIncome ? catInc : catExp,
+        description: desc || (isIncome ? 'Ingreso' : 'Gasto'),
+        notes
+      });
+    }
+    return records;
+  }
+  // Fallback: formato extracto Zelle (día numérico, monto, descripción)
+  return parseZelleCSV(csvText, year, month, catInc, catExp);
 }
 
 function parseZelleCSV(csvText, year, month, catInc, catExp) {
@@ -6632,10 +6667,11 @@ function _attachOnClose() {
         </label>
       </div>
       <label>
-        <div class="csv-file-btn" onclick="document.getElementById('csv-file-input').click()">
+        <div class="csv-file-btn">
           📂 <span id="csv-file-label">Seleccionar archivo CSV</span>
         </div>
         <input type="file" id="csv-file-input" accept=".csv,.txt" style="display:none" onchange="handleCSVFile(this)">
+
       </label>
       <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="csv-replace-month" style="width:auto">
