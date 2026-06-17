@@ -2088,7 +2088,12 @@ function initFromDrive(data) {
     if (c.forceReloadTs) forceReloadTs = c.forceReloadTs;
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
   }
-  if (data && data.deletedIds) deletedIds = [...new Set([...deletedIds, ...data.deletedIds])];
+  if (data && data.deletedIds) {
+    // No registrar como tombstone IDs que existen en los datos recién cargados
+    const liveLoaded = new Set([...txs.map(t=>t.id), ...homeTxs.map(t=>t.id), ...deudas.map(t=>t.id)]);
+    const safeDel = data.deletedIds.filter(id => !liveLoaded.has(id));
+    deletedIds = [...new Set([...deletedIds, ...safeDel])];
+  }
   if (data && data.deletedCustomRecords) {
     Object.entries(data.deletedCustomRecords).forEach(([mid, ids]) => {
       if (!deletedCustomRecords[mid]) deletedCustomRecords[mid] = [];
@@ -5272,11 +5277,11 @@ function initPWA() {
       })
       .catch(err => console.warn('[CashMap SW] No disponible:', err));
 
-    // Recargar automáticamente cuando el nuevo SW activa y envía SW_UPDATED
+    // SW actualizado: notificar sin recargar (reload forzaría initFromDrive con Drive potencialmente corrupto)
     navigator.serviceWorker.addEventListener('message', e => {
       if (e.data && e.data.type === 'SW_UPDATED') {
-        console.log('[CashMap SW] Nueva versión activa — recargando...');
-        window.location.reload();
+        console.log('[CashMap SW] Nueva versión activa');
+        showToast('✅ App actualizada — recarga manual si notas algo raro', 'var(--blue)', 4000);
       }
     });
   }
