@@ -1995,7 +1995,8 @@ let deferredInstallPrompt = null;
 let pendingOfflineChanges = false;
 let _pollTimer = null;
 let _pendingLocalChanges = false;
-let deletedIds = []; // tombstone para merge concurrente
+let deletedIds = []; // tombstone txs/deudas/home (IDs globales)
+let deletedCustomRecords = {}; // tombstone records de menús custom: {menuId: [recordId, ...]}
 let onlinePresence = {}; // { userId: { id, name, role, lastSeen } }
 let _applyingRemote = false;
 let _renderPending = false;
@@ -2088,6 +2089,12 @@ function initFromDrive(data) {
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
   }
   if (data && data.deletedIds) deletedIds = [...new Set([...deletedIds, ...data.deletedIds])];
+  if (data && data.deletedCustomRecords) {
+    Object.entries(data.deletedCustomRecords).forEach(([mid, ids]) => {
+      if (!deletedCustomRecords[mid]) deletedCustomRecords[mid] = [];
+      deletedCustomRecords[mid] = [...new Set([...deletedCustomRecords[mid], ...ids])];
+    });
+  }
   if (data && data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
   if (data && data.lastUpdated) lastUpdatedStr = data.lastUpdated;
   // Señal de recarga forzada por admin
@@ -2139,11 +2146,30 @@ function mergeData(local, remote) {
     (loc||[]).forEach(t => { if (!allDel.has(t.id)) map[t.id] = t; }); // local gana mismo id
     return Object.values(map);
   };
+  // Merge deletedCustomRecords: unión de ambos lados
+  const mergedDCR = {};
+  [local.deletedCustomRecords||{}, remote.deletedCustomRecords||{}].forEach(dcr => {
+    Object.entries(dcr).forEach(([mid, ids]) => {
+      if (!mergedDCR[mid]) mergedDCR[mid] = new Set();
+      ids.forEach(id => mergedDCR[mid].add(id));
+    });
+  });
+  const mergedDCRFinal = {};
+  Object.entries(mergedDCR).forEach(([k,s]) => { mergedDCRFinal[k] = [...s]; });
+
   const remoteMenuIds = new Set((remote.config?.customMenus||[]).map(m => m.id));
   const mergedMenus = [
     ...(remote.config?.customMenus||[]).map(rm => {
       const lm = (local.config?.customMenus||[]).find(x => x.id === rm.id);
-      return { ...rm, data: mergeArr(lm?.data||[], rm.data||[]) };
+      // Tombstones específicos de este menú — no mezclar con IDs globales
+      const menuDel = mergedDCR[rm.id] || new Set();
+      const mergeMenuData = (loc, rem) => {
+        const map = {};
+        (rem||[]).forEach(t => { if (!menuDel.has(t.id)) map[t.id] = t; });
+        (loc||[]).forEach(t => { if (!menuDel.has(t.id)) map[t.id] = t; });
+        return Object.values(map);
+      };
+      return { ...rm, data: mergeMenuData(lm?.data||[], rm.data||[]) };
     }),
     ...(local.config?.customMenus||[]).filter(lm => !remoteMenuIds.has(lm.id))
   ];
@@ -2164,8 +2190,9 @@ function mergeData(local, remote) {
     transactions: mergeArr(local.transactions, remote.transactions),
     deudas:       mergeArr(local.deudas,       remote.deudas),
     home:         mergeArr(local.home,          remote.home),
-    config:       { ...remote.config, customMenus: mergedMenus, navOrder: mergedNavOrder },
-    deletedIds:   [...allDel],
+    config:              { ...remote.config, customMenus: mergedMenus, navOrder: mergedNavOrder },
+    deletedIds:          [...allDel],
+    deletedCustomRecords: mergedDCRFinal,
     presence:     mergedPresence,
     lastUpdated:  new Date().toISOString()
   };
@@ -2184,6 +2211,7 @@ function pushToDrive() {
     },
     transactions:txs, deudas:deudas, home:homeTxs,
     deletedIds: [...new Set(deletedIds)],
+    deletedCustomRecords,
     presence: currentUser ? { ...onlinePresence, [currentUser.id]: { id:currentUser.id, name:currentUser.name, role:currentUser.role, lastSeen:new Date().toISOString() } } : onlinePresence
   };
 
@@ -2301,6 +2329,13 @@ function applyRemoteData(data) {
     if (c.budgets) budgets = c.budgets;
     if (c.savingsGoals) { savingsGoals = c.savingsGoals; if (savingsGoals.length) _nextGoalId = Math.max(...savingsGoals.map(g=>g.id))+1; }
     if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
+  }
+  if (data.deletedIds) deletedIds = [...new Set([...deletedIds, ...data.deletedIds])];
+  if (data.deletedCustomRecords) {
+    Object.entries(data.deletedCustomRecords).forEach(([mid, ids]) => {
+      if (!deletedCustomRecords[mid]) deletedCustomRecords[mid] = [];
+      deletedCustomRecords[mid] = [...new Set([...deletedCustomRecords[mid], ...ids])];
+    });
   }
   if (data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
   if (data.lastUpdated) lastUpdatedStr = data.lastUpdated;
@@ -4498,7 +4533,8 @@ function deleteCustomTx(menuId, txId) {
   const m = customMenus.find(x=>x.id===menuId);
   if (!m) return;
   showConfirm('¿Eliminar este registro?', ()=>{
-    deletedIds.push(txId);
+    if (!deletedCustomRecords[menuId]) deletedCustomRecords[menuId] = [];
+    deletedCustomRecords[menuId].push(txId);
     m.data = m.data.filter(t=>t.id!==txId);
     activeCustomMenuId = null;
     closeHomeTxModal();
