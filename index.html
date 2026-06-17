@@ -2092,7 +2092,11 @@ function initFromDrive(data) {
   if (data && data.deletedCustomRecords) {
     Object.entries(data.deletedCustomRecords).forEach(([mid, ids]) => {
       if (!deletedCustomRecords[mid]) deletedCustomRecords[mid] = [];
-      deletedCustomRecords[mid] = [...new Set([...deletedCustomRecords[mid], ...ids])];
+      // No registrar como tombstone IDs que existen en los datos cargados
+      const loadedMenu = customMenus.find(m => m.id === parseInt(mid));
+      const liveIds = new Set((loadedMenu?.data || []).map(t => t.id));
+      const safeIds = ids.filter(id => !liveIds.has(id));
+      deletedCustomRecords[mid] = [...new Set([...deletedCustomRecords[mid], ...safeIds])];
     });
   }
   if (data && data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
@@ -2168,7 +2172,7 @@ function mergeData(local, remote) {
       const mergeMenuData = (loc, rem) => {
         const map = {};
         (rem||[]).forEach(t => { if (!menuDel.has(t.id)) map[t.id] = t; });
-        (loc||[]).forEach(t => { if (!menuDel.has(t.id)) map[t.id] = t; });
+        (loc||[]).forEach(t => { map[t.id] = t; }); // local es autoritativo, nunca filtrado por tombstones remotos
         return Object.values(map);
       };
       return { ...rm, data: mergeMenuData(lm?.data||[], rm.data||[]) };
@@ -2187,6 +2191,13 @@ function mergeData(local, remote) {
       if (!mergedPresence[uid] || val.lastSeen > mergedPresence[uid].lastSeen) mergedPresence[uid] = val;
     });
   });
+  // Limpiar tombstones para IDs que sobrevivieron en mergedMenus (auto-sanación del DCR corrupto)
+  const mergedDCRClean = {};
+  Object.entries(mergedDCRFinal).forEach(([mid, ids]) => {
+    const menu = mergedMenus.find(m => m.id === parseInt(mid));
+    const liveIds = new Set((menu?.data || []).map(t => t.id));
+    mergedDCRClean[mid] = ids.filter(id => !liveIds.has(id));
+  });
   return {
     ...remote,
     transactions: mergeArr(local.transactions, remote.transactions),
@@ -2194,7 +2205,7 @@ function mergeData(local, remote) {
     home:         mergeArr(local.home,          remote.home),
     config:              { ...remote.config, customMenus: mergedMenus, navOrder: mergedNavOrder },
     deletedIds:          [...allDel],
-    deletedCustomRecords: mergedDCRFinal,
+    deletedCustomRecords: mergedDCRClean,
     presence:     mergedPresence,
     lastUpdated:  new Date().toISOString()
   };
@@ -2323,16 +2334,12 @@ function applyRemoteData(data) {
         ...c.customMenus.map(rm => {
           const lm = customMenus.find(x => x.id === rm.id);
           if (!lm) return rm; // menú nuevo en Drive — tomar completo
-          // Tombstones del menú: los que ya tenemos + los que trae Drive
-          const menuDel = new Set([
-            ...(deletedCustomRecords[rm.id] || []),
-            ...(incomingDCR[rm.id] || [])
-          ]);
-          // Merge por record: local gana mismo id (evita que Drive vacío pisotee local)
+          // Solo tombstones locales para filtrar remotos — incoming nunca elimina lo que ya tenemos local
+          const localMenuDel = new Set(deletedCustomRecords[rm.id] || []);
           const mergeMenuData = (loc, rem) => {
             const map = {};
-            (rem||[]).forEach(t => { if (!menuDel.has(t.id)) map[t.id] = t; });
-            (loc||[]).forEach(t => { if (!menuDel.has(t.id)) map[t.id] = t; });
+            (rem||[]).forEach(t => { if (!localMenuDel.has(t.id)) map[t.id] = t; });
+            (loc||[]).forEach(t => { map[t.id] = t; }); // local siempre gana, jamás eliminado por tombstones remotos
             return Object.values(map);
           };
           return { ...rm, data: mergeMenuData(lm.data || [], rm.data || []) };
@@ -2353,7 +2360,11 @@ function applyRemoteData(data) {
   if (data.deletedCustomRecords) {
     Object.entries(data.deletedCustomRecords).forEach(([mid, ids]) => {
       if (!deletedCustomRecords[mid]) deletedCustomRecords[mid] = [];
-      deletedCustomRecords[mid] = [...new Set([...deletedCustomRecords[mid], ...ids])];
+      // No importar tombstones remotos para IDs que existen en memoria local
+      const liveMenu = customMenus.find(m => m.id === parseInt(mid));
+      const liveIds = new Set((liveMenu?.data || []).map(t => t.id));
+      const safeIds = ids.filter(id => !liveIds.has(id));
+      deletedCustomRecords[mid] = [...new Set([...deletedCustomRecords[mid], ...safeIds])];
     });
   }
   if (data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
