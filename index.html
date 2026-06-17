@@ -867,6 +867,17 @@
   .attach-del{background:none;border:none;cursor:pointer;color:var(--text2);font-size:.82rem;padding:0 1px;flex-shrink:0;line-height:1}
   .attach-badge{font-size:.67rem;background:rgba(139,92,246,.18);color:#a78bfa;border-radius:99px;padding:1px 5px;margin-left:4px;white-space:nowrap;vertical-align:middle}
   .attach-uploading{font-size:.72rem;color:var(--text2)}
+  /* CSV Import modal */
+  .csv-file-btn{display:flex;align-items:center;gap:8px;background:var(--bg3);border:2px dashed var(--border);border-radius:10px;padding:14px 18px;cursor:pointer;font-size:.88rem;color:var(--text2);transition:.2s;width:100%;justify-content:center}
+  .csv-file-btn:hover{border-color:var(--acc);color:var(--text)}
+  .csv-preview-tbl{width:100%;border-collapse:collapse;font-size:.78rem}
+  .csv-preview-tbl th{background:var(--bg3);color:var(--text2);padding:6px 10px;text-align:left;font-weight:600;position:sticky;top:0}
+  .csv-preview-tbl td{padding:5px 10px;border-bottom:1px solid var(--border)}
+  .csv-preview-tbl tr:hover td{background:var(--bg3)}
+  .csv-preview-tbl .inc{color:var(--green)}.csv-preview-tbl .exp{color:var(--red)}
+  .csv-opts{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .csv-opts label{display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--text2)}
+  .csv-opts select,.csv-opts input{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;font-size:.83rem}
   .attach-thumb{width:52px;height:40px;object-fit:cover;border-radius:4px;cursor:zoom-in;border:1px solid var(--border);flex-shrink:0;transition:opacity .15s}
   .attach-thumb:hover{opacity:.8}
   .attach-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:10000;display:flex;align-items:center;justify-content:center;cursor:zoom-out}
@@ -4173,6 +4184,7 @@ function buildCustomMenuViews() {
           <div style="display:flex;align-items:center;gap:8px">
             <span id="cm-count-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
             <button class="btn btn-ghost" onclick="exportCustomCSV(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
+            <button class="btn btn-ghost" onclick="openCSVImportModal(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Importar CSV desde Excel">⬆ CSV</button>
             <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('custom')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
           </div>
         </div>
@@ -6218,6 +6230,207 @@ function _attachInit(savedAtts) {
   renderAttachmentList();
 }
 
+// ============================================================
+// CSV IMPORT — importar registros desde Excel exportado a CSV
+// ============================================================
+let _csvImportMenuId = null;
+let _csvParsedRecords = [];
+
+function openCSVImportModal(menuId) {
+  if (isReadOnly()) { showToast('Sin permisos para importar', 'var(--red)'); return; }
+  _csvImportMenuId = menuId;
+  _csvParsedRecords = [];
+
+  // Rellenar años
+  const yrSel = document.getElementById('csv-year');
+  const curY = new Date().getFullYear();
+  yrSel.innerHTML = '';
+  for (let y = curY; y >= curY - 6; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    yrSel.appendChild(o);
+  }
+
+  // Mes actual
+  const curM = String(new Date().getMonth() + 1).padStart(2, '0');
+  document.getElementById('csv-month').value = curM;
+
+  // Categorías
+  const incSel = document.getElementById('csv-cat-inc');
+  const expSel = document.getElementById('csv-cat-exp');
+  incSel.innerHTML = Object.entries(globalCats.inc).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('');
+  expSel.innerHTML = Object.entries(globalCats.exp).map(([k,v]) => `<option value="${k}">${v.label}</option>`).join('');
+
+  // Reset
+  document.getElementById('csv-file-label').textContent = 'Seleccionar archivo CSV';
+  document.getElementById('csv-file-input').value = '';
+  document.getElementById('csv-preview-wrap').style.display = 'none';
+  document.getElementById('csv-import-btn').style.display = 'none';
+  document.getElementById('csv-replace-month').checked = false;
+
+  const modal = document.getElementById('csv-import-modal');
+  modal.classList.add('open');
+  modal.style.display = 'flex';
+}
+
+function closeCsvImportModal() {
+  const modal = document.getElementById('csv-import-modal');
+  modal.classList.remove('open');
+  modal.style.display = 'none';
+}
+
+function handleCSVFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('csv-file-label').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const year  = parseInt(document.getElementById('csv-year').value);
+    const month = document.getElementById('csv-month').value;
+    const catInc = document.getElementById('csv-cat-inc').value;
+    const catExp = document.getElementById('csv-cat-exp').value;
+    _csvParsedRecords = parseZelleCSV(e.target.result, year, month, catInc, catExp);
+    renderCSVPreview(_csvParsedRecords);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseZelleCSV(csvText, year, month, catInc, catExp) {
+  const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+  const records = [];
+  let lastDay = null;
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = splitCSVLine(lines[i]);
+    if (!cols || cols.length < 2) continue;
+
+    const dayRaw = (cols[0] || '').trim();
+    const amtRaw = (cols[1] || '').trim();
+    const obs    = (cols[2] || '').trim();
+
+    // Saltar filas de totales
+    if (dayRaw.toLowerCase() === 'total') continue;
+
+    // Actualizar día si es numérico
+    const dayNum = parseInt(dayRaw);
+    if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) lastDay = dayNum;
+    if (!lastDay) continue;
+
+    const amount = parseZelleAmount(amtRaw);
+    if (amount === 0) continue;
+
+    const mm = String(month).padStart(2, '0');
+    const dd = String(lastDay).padStart(2, '0');
+
+    records.push({
+      date:        `${year}-${mm}-${dd}`,
+      amount:      Math.abs(amount),
+      type:        amount > 0 ? 'income' : 'expense',
+      category:    amount > 0 ? catInc : catExp,
+      description: obs || (amount > 0 ? 'Envío recibido' : 'Envío enviado'),
+      notes:       ''
+    });
+  }
+  return records;
+}
+
+function parseZelleAmount(raw) {
+  if (!raw) return 0;
+  const s = raw.trim();
+  if (!s || s.replace(/[\s$\-,.()]/g, '') === '') return 0;
+  const neg = s.includes('(') && s.includes(')');
+  const num = s.replace(/\$/g, '').replace(/[()]/g, '').replace(/\s/g, '').replace(',', '.');
+  const val = parseFloat(num);
+  if (isNaN(val) || val === 0) return 0;
+  return neg ? -val : val;
+}
+
+function splitCSVLine(line) {
+  const cols = [];
+  let i = 0;
+  while (i <= line.length) {
+    if (i === line.length) { cols.push(''); break; }
+    if (line[i] === '"') {
+      let j = i + 1;
+      while (j < line.length) {
+        if (line[j] === '"' && line[j+1] === '"') { j += 2; continue; }
+        if (line[j] === '"') break;
+        j++;
+      }
+      cols.push(line.slice(i+1, j).replace(/""/g, '"'));
+      i = j + 1;
+      if (line[i] === ',') i++;
+    } else {
+      const end = line.indexOf(',', i);
+      if (end === -1) { cols.push(line.slice(i)); break; }
+      cols.push(line.slice(i, end));
+      i = end + 1;
+    }
+  }
+  return cols;
+}
+
+function renderCSVPreview(records) {
+  const wrap = document.getElementById('csv-preview-wrap');
+  const info = document.getElementById('csv-preview-info');
+  const head = document.getElementById('csv-preview-head');
+  const body = document.getElementById('csv-preview-body');
+  const btn  = document.getElementById('csv-import-btn');
+
+  if (!records.length) {
+    info.textContent = '⚠️ No se encontraron registros válidos en el archivo.';
+    head.innerHTML = ''; body.innerHTML = '';
+    wrap.style.display = 'block';
+    btn.style.display = 'none';
+    return;
+  }
+
+  const inc = records.filter(r => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+  const exp = records.filter(r => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+  info.innerHTML = `<strong>${records.length}</strong> registros — Ingresos: <span style="color:var(--green)">$${inc.toFixed(2)}</span> · Gastos: <span style="color:var(--red)">$${exp.toFixed(2)}</span>`;
+
+  const m = customMenus.find(x => x.id === _csvImportMenuId);
+  const fmt = v => (m?.currency || '$') + v.toFixed(2);
+
+  head.innerHTML = '<tr><th>Fecha</th><th>Monto</th><th>Tipo</th><th>Descripción</th><th>Categoría</th></tr>';
+  body.innerHTML = records.map(r =>
+    `<tr><td>${r.date}</td>
+     <td class="${r.type === 'income' ? 'inc' : 'exp'}">${r.type === 'expense' ? '-' : '+'}${fmt(r.amount)}</td>
+     <td>${r.type === 'income' ? '↑ Ingreso' : '↓ Gasto'}</td>
+     <td>${r.description}</td>
+     <td>${r.category}</td></tr>`
+  ).join('');
+
+  wrap.style.display = 'block';
+  btn.textContent = `⬆ Importar ${records.length} registros`;
+  btn.style.display = 'inline-flex';
+}
+
+function doCSVImport() {
+  if (!_csvParsedRecords.length || _csvImportMenuId === null) return;
+  const m = customMenus.find(x => x.id === _csvImportMenuId);
+  if (!m) return;
+
+  const replaceMonth = document.getElementById('csv-replace-month').checked;
+  if (replaceMonth) {
+    const month = document.getElementById('csv-month').value;
+    const year  = document.getElementById('csv-year').value;
+    const prefix = `${year}-${String(month).padStart(2,'0')}`;
+    m.data = (m.data || []).filter(r => !r.date.startsWith(prefix));
+  }
+
+  if (!m.nextDataId) m.nextDataId = (m.data.reduce((mx,x) => Math.max(mx, x.id), 0) + 1);
+  _csvParsedRecords.forEach(r => {
+    m.data.push({ id: m.nextDataId++, ...r, attachments: [] });
+  });
+
+  closeCsvImportModal();
+  renderCustomMenuView(_csvImportMenuId);
+  scheduleSave();
+  showToast(`✅ ${_csvParsedRecords.length} registros importados`);
+  _csvParsedRecords = [];
+}
+
 function _attachOnClose() {
   if (!_attachSaved) {
     // usuario canceló → borrar archivos nuevos subidos en esta sesión
@@ -6229,5 +6442,58 @@ function _attachOnClose() {
 }
 </script>
 <input type="file" id="attach-file-input" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="handleAttachUpload(this)">
+
+<!-- CSV Import Modal -->
+<div class="modal-overlay" id="csv-import-modal">
+  <div class="modal" style="max-width:700px;width:95vw;max-height:90vh;overflow-y:auto">
+    <div class="modal-header">
+      <h3>⬆ Importar CSV desde Excel</h3>
+      <button class="modal-close" onclick="closeCsvImportModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="csv-opts">
+        <label>Año
+          <select id="csv-year"></select>
+        </label>
+        <label>Mes
+          <select id="csv-month">
+            <option value="01">Enero</option><option value="02">Febrero</option>
+            <option value="03">Marzo</option><option value="04">Abril</option>
+            <option value="05">Mayo</option><option value="06">Junio</option>
+            <option value="07">Julio</option><option value="08">Agosto</option>
+            <option value="09">Septiembre</option><option value="10">Octubre</option>
+            <option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+        </label>
+        <label>Categoría ingresos
+          <select id="csv-cat-inc"></select>
+        </label>
+        <label>Categoría gastos
+          <select id="csv-cat-exp"></select>
+        </label>
+      </div>
+      <label>
+        <div class="csv-file-btn" onclick="document.getElementById('csv-file-input').click()">
+          📂 <span id="csv-file-label">Seleccionar archivo CSV</span>
+        </div>
+        <input type="file" id="csv-file-input" accept=".csv,.txt" style="display:none" onchange="handleCSVFile(this)">
+      </label>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="csv-replace-month" style="width:auto">
+        <label for="csv-replace-month" style="font-size:.82rem;color:var(--text2)">Reemplazar registros existentes del mes seleccionado</label>
+      </div>
+      <div id="csv-preview-wrap" style="display:none;margin-top:14px">
+        <p id="csv-preview-info" style="font-size:.82rem;color:var(--text2);margin-bottom:8px"></p>
+        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+          <table class="csv-preview-tbl"><thead id="csv-preview-head"></thead><tbody id="csv-preview-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeCsvImportModal()">Cancelar</button>
+      <button class="btn btn-primary" id="csv-import-btn" onclick="doCSVImport()" style="display:none">⬆ Importar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
