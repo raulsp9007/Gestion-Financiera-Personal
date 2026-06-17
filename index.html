@@ -4014,13 +4014,11 @@ function renderApp() {
   }
   // Procesar transacciones recurrentes automáticamente
   try { processRecurringAuto(); } catch(e) {}
-  // Heartbeat de presencia: push cada 60s aunque no haya cambios
+  // Heartbeat de presencia: push cada 60s SOLO si hay cambios pendientes
   if (!window._presenceHeartbeat) {
     window._presenceHeartbeat = setInterval(() => {
-      if (currentUser && navigator.onLine) pushToDrive();
+      if (currentUser && navigator.onLine && _pendingLocalChanges) pushToDrive();
     }, 60000);
-    // Ping inicial tras 3s (dejar que initFromDrive termine)
-    setTimeout(() => { if (currentUser && navigator.onLine) pushToDrive(); }, 3000);
   }
 }
 
