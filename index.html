@@ -2314,9 +2314,18 @@ function applyRemoteData(data) {
   if (_pendingLocalChanges) return;
   if (_applyingRemote) return;
   _applyingRemote = true;
-  if (Array.isArray(data.transactions)) txs = data.transactions;
-  if (Array.isArray(data.deudas)) deudas = data.deudas;
-  if (Array.isArray(data.home)) homeTxs = data.home;
+  // Merge en vez de replace: local gana mismo id, remoto aporta registros nuevos
+  // Usa solo tombstones locales (deletedIds pre-merge) para no importar corrupciones remotas
+  const _safeMerge = (loc, rem) => {
+    const localDel = new Set(deletedIds);
+    const map = {};
+    (rem||[]).forEach(t => { if (!localDel.has(t.id)) map[t.id] = t; });
+    (loc||[]).forEach(t => { map[t.id] = t; }); // local siempre gana
+    return Object.values(map);
+  };
+  if (Array.isArray(data.transactions)) txs = _safeMerge(txs, data.transactions);
+  if (Array.isArray(data.deudas)) deudas = _safeMerge(deudas, data.deudas);
+  if (Array.isArray(data.home)) homeTxs = _safeMerge(homeTxs, data.home);
   if (data.config) {
     const c = data.config;
     if (c.globalCats) { globalCats = c.globalCats; rebuildLegacyCatMaps(); }
