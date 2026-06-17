@@ -6696,34 +6696,3 @@ function _attachOnClose() {
 </div>
 </body>
 </html>
-// ============================================================
-// DASHBOARD CARD VISIBILITY (localStorage)
-// ============================================================
-function getHiddenDashCards() {
-  try {
-    return JSON.parse(localStorage.getItem('cashmap_hidden_dash_cards') || '[]');
-  } catch(e) { return []; }
-}
-
-function setHiddenDashCards(hiddenList) {
-  localStorage.setItem('cashmap_hidden_dash_cards', JSON.stringify(hiddenList));
-}
-
-function isDashCardHidden(id) {
-  return getHiddenDashCards().includes(id);
-}
-
-function toggleDashCard(id) {
-  let hidden = getHiddenDashCards();
-  const idx = hidden.indexOf(id);
-  if (idx >= 0) {
-    hidden.splice(idx, 1);
-  } else {
-    hidden.push(id);
-  }
-  setHiddenDashCards(hidden);
-  // Re-renderizar solo las tarjetas (sin recargar toda la página)
-  renderDashCustomMenus();
-  // Opcional: mostrar un mensaje
-  showToast(`Tarjeta ${idx >= 0 ? 'mostrada' : 'oculta'}`, 'var(--acc)');
-}
