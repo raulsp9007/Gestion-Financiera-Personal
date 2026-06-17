@@ -2316,8 +2316,25 @@ function applyRemoteData(data) {
     if (c.customMenus) {
       const allDel = new Set(deletedIds);
       const remoteMenuIds = new Set(c.customMenus.map(m => m.id));
+      const incomingDCR = data.deletedCustomRecords || {};
       customMenus = [
-        ...c.customMenus,
+        ...c.customMenus.map(rm => {
+          const lm = customMenus.find(x => x.id === rm.id);
+          if (!lm) return rm; // menú nuevo en Drive — tomar completo
+          // Tombstones del menú: los que ya tenemos + los que trae Drive
+          const menuDel = new Set([
+            ...(deletedCustomRecords[rm.id] || []),
+            ...(incomingDCR[rm.id] || [])
+          ]);
+          // Merge por record: local gana mismo id (evita que Drive vacío pisotee local)
+          const mergeMenuData = (loc, rem) => {
+            const map = {};
+            (rem||[]).forEach(t => { if (!menuDel.has(t.id)) map[t.id] = t; });
+            (loc||[]).forEach(t => { if (!menuDel.has(t.id)) map[t.id] = t; });
+            return Object.values(map);
+          };
+          return { ...rm, data: mergeMenuData(lm.data || [], rm.data || []) };
+        }),
         ...customMenus.filter(m => !remoteMenuIds.has(m.id) && !allDel.has(m.id))
       ];
       buildCustomMenuViews();
