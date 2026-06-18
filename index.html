@@ -3154,36 +3154,52 @@ function populateCatFilter() {
 }
 
 function renderHistory() {
-  let list = [...txs];
-  const s = document.getElementById('f-search').value.toLowerCase();
-  const tp = document.getElementById('f-type').value;
-  const cat = document.getElementById('f-cat').value;
-  const mm = document.getElementById('f-month').value;
-  const df = document.getElementById('f-date-from')?.value;
-  const dt = document.getElementById('f-date-to')?.value;
-  if (s)  list = list.filter(t=>t.description.toLowerCase().includes(s)||(t.notes||'').toLowerCase().includes(s));
-  if (tp) list = list.filter(t=>t.type===tp);
-  if (cat) list = list.filter(t=>t.category===cat);
-  if (mm) list = list.filter(t=>txMonth(t)===mm);
-  if (df) list = list.filter(t=>isDateFrom(t.date, df));
-  if (dt) list = list.filter(t=>isDateTo(t.date, dt));
-  list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
-
-  const { order: hOrd, hidden: hHid } = getColConfig('history');
-  const hDefs = COL_DEFS.history;
-  const hVis  = hOrd.filter(c => !hHid.includes(c) && hDefs[c]);
-  const hSpan = hVis.length + 1;
-  document.getElementById('hist-thead').innerHTML =
-    `<tr>${hVis.map(c=>`<th>${hDefs[c].label}</th>`).join('')}<th>Acciones</th></tr>`;
-  document.getElementById('hist-count').textContent = list.length + ' transacciones';
-  document.getElementById('hist-tbody').innerHTML = list.length ? renderRowsWithDateSep(list, t=>`
-    <tr onclick="rowTap(event,()=>openTxModal(${t.id}))">
-      ${hVis.map(c => hDefs[c].fn(t)).join('')}
-      <td style="display:flex;gap:3px">
-        <button class="btn-icon" onclick="openTxModal(${t.id})" title="Editar">✏️</button>
-        <button class="btn-icon" onclick="dupeTx(${t.id})" title="Duplicar">📋</button>
-      </td>
-    </tr>`, hSpan) : `<tr><td colspan="${hSpan}" class="empty">📭 Sin transacciones — toca <b>+ Nuevo</b> para agregar</td></tr>`;
+// Limpiar filtros de fecha si están causando problemas
+const dfEl = document.getElementById('f-date-from');
+const dtEl = document.getElementById('f-date-to');
+if (dfEl && dfEl.value === '') dfEl.value = '';
+if (dtEl && dtEl.value === '') dtEl.value = '';
+    let list = [...txs];
+    const s = document.getElementById('f-search').value.toLowerCase();
+    const tp = document.getElementById('f-type').value;
+    const cat = document.getElementById('f-cat').value;
+    const mm = document.getElementById('f-month').value;
+    const df = document.getElementById('f-date-from')?.value;
+    const dt = document.getElementById('f-date-to')?.value;
+    
+    if (s)  list = list.filter(t=>t.description.toLowerCase().includes(s)||(t.notes||'').toLowerCase().includes(s));
+    if (tp) list = list.filter(t=>t.type===tp);
+    if (cat) list = list.filter(t=>t.category===cat);
+    if (mm) list = list.filter(t=>txMonth(t)===mm);
+    if (df) list = list.filter(t=>isDateFrom(t.date, df));
+    if (dt) list = list.filter(t=>isDateTo(t.date, dt));
+    
+    list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
+    
+    const { order: hOrd, hidden: hHid } = getColConfig('history');
+    const hDefs = COL_DEFS.history;
+    const hVis  = hOrd.filter(c => !hHid.includes(c) && hDefs[c]);
+    const hSpan = hVis.length + 1;
+    
+    document.getElementById('hist-thead').innerHTML =
+        `<tr>${hVis.map(c=>`<th>${hDefs[c].label}</th>`).join('')}<th>Acciones</th></tr>`;
+    document.getElementById('hist-count').textContent = list.length + ' transacciones';
+    
+    if (list.length === 0) {
+        console.log('⚠️ Historial vacío. Total txs:', txs.length);
+        if (txs.length > 0) {
+            console.log('Última transacción:', txs[txs.length-1]);
+        }
+    }
+    
+    document.getElementById('hist-tbody').innerHTML = list.length ? renderRowsWithDateSep(list, t=>`
+        <tr onclick="rowTap(event,()=>openTxModal(${t.id}))">
+            ${hVis.map(c => hDefs[c].fn(t)).join('')}
+            <td style="display:flex;gap:3px">
+                <button class="btn-icon" onclick="openTxModal(${t.id})" title="Editar">✏️</button>
+                <button class="btn-icon" onclick="dupeTx(${t.id})" title="Duplicar">📋</button>
+            </td>
+        </tr>`, hSpan) : `<tr><td colspan="${hSpan}" class="empty">📭 Sin transacciones — toca <b>+ Nuevo</b> para agregar</td></tr>`;
 }
 
 // ============================================================
@@ -3364,7 +3380,13 @@ function saveTx() {
   scheduleSave();
   checkBudgetAlerts();
 }
-
+// Función de diagnóstico - puedes eliminarla después
+function debugSaveTx() {
+    console.log('=== DEBUG SAVE TX ===');
+    console.log('Total transacciones:', txs.length);
+    console.log('Últimas 3 transacciones:', txs.slice(-3));
+    console.log('===================');
+}
 // Abre modal de transacción pre-llenado desde una deuda
 function openPaymentFromDeuda(deudaId) {
   const d = deudas.find(x=>x.id===deudaId);
