@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+index.html<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -1309,7 +1309,7 @@
     <div class="form-grid">
       <div class="form-row">
         <label>Fecha</label>
-        <input type="date" id="tx-date">
+        <input type="datetime-local" id="tx-date" step="1">
       </div>
       <div class="form-row">
         <label>Monto (USD)</label>
@@ -1377,7 +1377,7 @@
     <div class="form-grid">
       <div class="form-row">
         <label>Fecha</label>
-        <input type="date" id="home-tx-date">
+        <input type="datetime-local" id="home-tx-date" step="1">
       </div>
       <div class="form-row">
         <label>Monto <span id="home-modal-curr" style="font-size:.75rem;color:var(--text2)"></span></label>
@@ -1830,13 +1830,37 @@ function getAppTimezone() {
 // Formatea una fecha "YYYY-MM-DD" a string legible en la zona horaria elegida
 function formatDate(dateStr, timezone) {
     if (!dateStr) return '';
-    const date = new Date(dateStr + 'T00:00:00');
-    return new Intl.DateTimeFormat('es', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    }).format(date);
+    let date;
+    if (dateStr.includes('T')) {
+        date = new Date(dateStr);
+    } else {
+        date = new Date(dateStr + 'T00:00:00');
+    }
+    
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const seconds = date.getSeconds();
+    const hasTime = hours > 0 || minutes > 0 || seconds > 0;
+    
+    if (hasTime) {
+        return new Intl.DateTimeFormat('es', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }).format(date);
+    } else {
+        return new Intl.DateTimeFormat('es', {
+            timeZone: timezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).format(date);
+    }
 }
 
 // Devuelve la fecha de hoy en la zona horaria elegida (formato YYYY-MM-DD)
@@ -1846,13 +1870,36 @@ function getTodayInTimezone(timezone) {
         timeZone: timezone,
         year: 'numeric',
         month: '2-digit',
-        day: '2-digit'
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
     });
     const parts = formatter.formatToParts(now);
     const year = parts.find(p => p.type === 'year').value;
     const month = parts.find(p => p.type === 'month').value;
     const day = parts.find(p => p.type === 'day').value;
-    return `${year}-${month}-${day}`;
+    const hour = parts.find(p => p.type === 'hour').value;
+    const minute = parts.find(p => p.type === 'minute').value;
+    const second = parts.find(p => p.type === 'second').value;
+    return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+}
+// Helper para comparar fechas (ignora hora)
+function dateOnly(dateStr) {
+    return dateStr ? dateStr.substring(0, 10) : '';
+}
+
+// Comparación para filtro "desde" (inclusivo)
+function isDateFrom(txDate, fromDate) {
+    if (!fromDate) return true;
+    return dateOnly(txDate) >= fromDate;
+}
+
+// Comparación para filtro "hasta" (inclusivo)
+function isDateTo(txDate, toDate) {
+    if (!toDate) return true;
+    return dateOnly(txDate) <= toDate;
 }
 
 // Genera opciones para el selector de zona horaria
@@ -3118,8 +3165,8 @@ function renderHistory() {
   if (tp) list = list.filter(t=>t.type===tp);
   if (cat) list = list.filter(t=>t.category===cat);
   if (mm) list = list.filter(t=>txMonth(t)===mm);
-  if (df) list = list.filter(t=>t.date>=df);
-  if (dt) list = list.filter(t=>t.date<=dt);
+  if (df) list = list.filter(t=>isDateFrom(t.date, df));
+  if (dt) list = list.filter(t=>isDateTo(t.date, dt));
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
   const { order: hOrd, hidden: hHid } = getColConfig('history');
@@ -6280,8 +6327,8 @@ function exportCSV() {
   if (tp) list = list.filter(t=>t.type===tp);
   if (cat)list = list.filter(t=>t.category===cat);
   if (mm) list = list.filter(t=>txMonth(t)===mm);
-  if (df) list = list.filter(t=>t.date>=df);
-  if (dt) list = list.filter(t=>t.date<=dt);
+  if (df) list = list.filter(t=>isDateFrom(t.date, df));
+  if (dt) list = list.filter(t=>isDateTo(t.date, dt));
   list.sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
   const esc = v => '"' + String(v||'').replace(/"/g,'""') + '"';
   const header = ['Fecha','Monto','Tipo','Categoría','Descripción','Notas','Recurrencia'];
@@ -6335,8 +6382,8 @@ function exportHomeCSV() {
   if (tp) list = list.filter(t=>t.type===tp);
   if (cat)list = list.filter(t=>t.category===cat);
   if (mm) list = list.filter(t=>t.date.substring(5,7)===mm);
-  if (df) list = list.filter(t=>t.date>=df);
-  if (dt) list = list.filter(t=>t.date<=dt);
+  if (df) list = list.filter(t=>isDateFrom(t.date, df));
+  if (dt) list = list.filter(t=>isDateTo(t.date, dt));
   _downloadCSV(list, `cashmap-home-${mm||'todo'}-${new Date().toISOString().slice(0,10)}.csv`, k=>catLabel(k));
 }
 
@@ -6354,8 +6401,8 @@ function exportCustomCSV(menuId) {
   if (tp) list = list.filter(t=>t.type===tp);
   if (cat)list = list.filter(t=>t.category===cat);
   if (mm) list = list.filter(t=>t.date.substring(5,7)===mm);
-  if (df) list = list.filter(t=>t.date>=df);
-  if (dt) list = list.filter(t=>t.date<=dt);
+  if (df) list = list.filter(t=>isDateFrom(t.date, df));
+  if (dt) list = list.filter(t=>isDateTo(t.date, dt));
   _downloadCSV(list, `cashmap-${m.name.replace(/\s+/g,'-').toLowerCase()}-${mm||'todo'}-${new Date().toISOString().slice(0,10)}.csv`, k=>catLabel(k));
 }
 
