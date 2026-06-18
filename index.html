@@ -1584,6 +1584,7 @@
       <button class="cats-tab active" data-tab="inc" onclick="switchCatsTab('inc')">💰 Ingresos</button>
       <button class="cats-tab" data-tab="exp" onclick="switchCatsTab('exp')">💸 Gastos</button>
       <button class="cats-tab" data-tab="config" onclick="switchCatsTab('config')">🔧 Config</button>
+      <button class="cats-tab" data-tab="timezone" onclick="switchCatsTab('timezone')">🕒 Zona horaria</button>
     </div>
 
     <!-- Listas de categorías -->
@@ -1623,6 +1624,17 @@
         <input type="text" id="config-home-curr" placeholder="L, RD$, MXN$, €..." style="max-width:120px">
       </div>
       <button class="btn btn-primary" onclick="saveCurrencyConfig()" style="font-size:.82rem">Guardar moneda</button>
+    </div>
+
+    <!-- Timezone tab content -->
+    <div id="cats-timezone-panel" style="display:none;background:var(--bg3);border-radius:10px;padding:14px;margin-bottom:14px">
+      <p style="font-size:.82rem;color:var(--text2);margin-bottom:14px">Selecciona tu zona horaria. Las fechas se ajustarán automáticamente.</p>
+      <div class="form-row">
+        <label>Zona horaria</label>
+        <select id="timezone-selector" style="width:100%"></select>
+      </div>
+      <button class="btn btn-primary" onclick="saveTimezone()" style="font-size:.82rem">Guardar zona horaria</button>
+      <div id="timezone-status" style="font-size:.75rem;color:var(--text2);margin-top:8px"></div>
     </div>
 
     <div class="modal-actions" style="margin-top:0">
@@ -1805,6 +1817,60 @@ const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto
 const MONTH_KEYS = ['01','02','03','04','05','06','07','08','09','10','11','12'];
 
 // ============================================================
+// ZONA HORARIA — funciones auxiliares
+// ============================================================
+
+let APP_CONFIG = null; // Configuración global (incluye timezone)
+
+// Obtiene la zona horaria guardada o la del navegador
+function getAppTimezone() {
+    return APP_CONFIG?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+// Formatea una fecha "YYYY-MM-DD" a string legible en la zona horaria elegida
+function formatDate(dateStr, timezone) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T00:00:00');
+    return new Intl.DateTimeFormat('es', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(date);
+}
+
+// Devuelve la fecha de hoy en la zona horaria elegida (formato YYYY-MM-DD)
+function getTodayInTimezone(timezone) {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('es', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    const parts = formatter.formatToParts(now);
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+    return `${year}-${month}-${day}`;
+}
+
+// Genera opciones para el selector de zona horaria
+function getTimezoneOptions() {
+    const timeZones = [];
+    const now = new Date();
+    for (const tz of Intl.supportedValuesOf('timeZone')) {
+        const offset = new Intl.DateTimeFormat('es', {
+            timeZone: tz,
+            timeZoneName: 'shortOffset'
+        }).formatToParts(now).find(p => p.type === 'timeZoneName')?.value || '';
+        timeZones.push({ value: tz, label: `${tz} (${offset})` });
+    }
+    timeZones.sort((a, b) => a.label.localeCompare(b.label));
+    return timeZones;
+}
+
+// ============================================================
 // CATEGORÍAS — DINÁMICAS (editables desde el panel de config)
 // ============================================================
 // Zelle (USD) — ingresos y gastos compartidos en un solo objeto
@@ -1933,7 +1999,7 @@ function recBadge(t) {
 
 const COL_DEFS = {
   history: {
-    date:        { label: 'Fecha',       fn: t => `<td>${t.date}</td>` },
+    date:        { label: 'Fecha',       fn: t => `<td>${formatDate(t.date, getAppTimezone())}</td>` },
     amount:      { label: 'Monto',       fn: t => `<td class="amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}${recBadge(t)}</td>` },
     description: { label: 'Descripción', fn: t => `<td>${t.description}${t.attachments?.length?`<span class="attach-badge">📎${t.attachments.length}</span>`:''}</td>` },
     type:        { label: 'Tipo',        fn: t => `<td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>` },
@@ -1941,7 +2007,7 @@ const COL_DEFS = {
     notes:       { label: 'Notas',       fn: t => `<td>${renderNote(t.notes)}</td>` },
   },
   deudas: {
-    date:        { label: 'Fecha',       fn: d => `<td class="deuda-col-date">${d.date}</td>` },
+    date:        { label: 'Fecha',       fn: d => `<td class="deuda-col-date">${formatDate(d.date, getAppTimezone())}</td>` },
     persona:     { label: 'Persona',     fn: d => `<td class="deuda-col-persona">${d.persona}</td>` },
     description: { label: 'Descripción', fn: d => `<td class="deuda-col-desc">${d.description||'—'}</td>` },
     type:        { label: 'Tipo',        fn: d => `<td class="deuda-col-type"><span class="badge ${d.type}">${d.type==='por_cobrar'?'Préstamo dado':'Préstamo recibido'}</span></td>` },
@@ -1950,7 +2016,7 @@ const COL_DEFS = {
     status:      { label: 'Estado',      fn: d => `<td class="deuda-col-status"><span class="badge ${d.status}">${deudaStatusLabel(d)}</span></td>` },
   },
   home: {
-    date:        { label: 'Fecha',       fn: t => `<td>${t.date}</td>` },
+    date:        { label: 'Fecha',       fn: t => `<td>${formatDate(t.date, getAppTimezone())}</td>` },
     amount:      { label: 'Monto',       fn: t => `<td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${fmtH(t.amount)}${recBadge(t)}</td>` },
     description: { label: 'Descripción', fn: t => `<td>${t.description}${t.attachments?.length?`<span class="attach-badge">📎${t.attachments.length}</span>`:''}</td>` },
     type:        { label: 'Tipo',        fn: t => `<td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>` },
@@ -1958,7 +2024,7 @@ const COL_DEFS = {
     notes:       { label: 'Notas',       fn: t => `<td>${renderNote(t.notes)}</td>` },
   },
   custom: {
-    date:        { label: 'Fecha',       fn: (t,curr) => `<td>${t.date}</td>` },
+    date:        { label: 'Fecha',       fn: (t,curr) => `<td>${formatDate(t.date, getAppTimezone())}</td>` },
     amount:      { label: 'Monto',       fn: (t,curr) => `<td class="amount ${t.type}" style="font-weight:700">${t.type==='income'?'+':'-'}${curr}${t.amount.toLocaleString('es',{minimumFractionDigits:2,maximumFractionDigits:2})}${recBadge(t)}</td>` },
     description: { label: 'Descripción', fn: (t,curr) => `<td>${t.description}${t.attachments?.length?`<span class="attach-badge">📎${t.attachments.length}</span>`:''}</td>` },
     type:        { label: 'Tipo',        fn: (t,curr) => `<td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>` },
@@ -2201,6 +2267,7 @@ function initFromDrive(data) {
   // Cargar config (categorías, usuarios, menús)
   if (data && data.config) {
     const c = data.config;
+    APP_CONFIG = c; // Guardar referencia global para zona horaria
     if (c.globalCats) {
       // Nuevo formato
       globalCats = c.globalCats;
@@ -2236,6 +2303,13 @@ function initFromDrive(data) {
     if (c.menuVisibility) {
       localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
     }
+    // Asegurar que existe la zona horaria (guardar la detectada si no está)
+    if (!c.timezone) {
+      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      c.timezone = detected;
+      scheduleSave(); // Marcamos para guardar en la nube
+    }
+    if (!APP_CONFIG.timezone) APP_CONFIG.timezone = c.timezone;
   }
   if (data && data.deletedIds) {
     // No registrar como tombstone IDs que existen en los datos recién cargados
@@ -2270,7 +2344,7 @@ function initFromDrive(data) {
   try {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,hiddenNavItems:hiddenNavItems,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder},
+      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,hiddenNavItems:hiddenNavItems,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder,timezone:APP_CONFIG?.timezone},
       deletedIds:[...deletedIds],
       deletedCustomRecords
     };
@@ -2374,7 +2448,8 @@ function pushToDrive() {
     config: {
       globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, hiddenNavItems:hiddenNavItems, sessionSeed:sessionSeed, budgets:budgets, savingsGoals:savingsGoals,
       colConfig: JSON.parse(localStorage.getItem('cashmap_col_config') || '{}'),
-      forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder, menuVisibility: JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}')     
+      forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder, menuVisibility: JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}'),
+      timezone: getAppTimezone()
     },
     transactions:txs, deudas:deudas, home:homeTxs,
     deletedIds: [...new Set(deletedIds)],
@@ -3001,7 +3076,7 @@ function renderMonthly() {
   document.getElementById('month-tbl-title').textContent = monthName(currentMonth) + ' 2026 – ' + list.length + ' transacciones';
   document.getElementById('month-tbody').innerHTML = list.length ? list.map(t=>`
     <tr>
-      <td>${t.date}</td>
+      <td>${formatDate(t.date, getAppTimezone())}</td>
       <td class="amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</td>
       <td>${t.description}</td>
       <td><span class="badge ${t.type}">${t.type==='income'?'Ingreso':'Gasto'}</span></td>
@@ -3158,7 +3233,7 @@ function openTxModal(id) {
   const del = document.getElementById('modal-del-btn');
   // 1. Establecer valores base PRIMERO
   document.getElementById('tx-id').value = '';
-  document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tx-date').value = getTodayInTimezone(getAppTimezone());
   document.getElementById('tx-amount').value = '';
   document.getElementById('tx-desc').value = '';
   document.getElementById('tx-type').value = 'expense';
@@ -3255,7 +3330,7 @@ function openPaymentFromDeuda(deudaId) {
 
   document.getElementById('modal-title').textContent = '💸 Registrar pago – ' + d.persona;
   document.getElementById('tx-id').value = '';
-  document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tx-date').value = getTodayInTimezone(getAppTimezone());
   document.getElementById('tx-amount').value = d.amount;
   document.getElementById('tx-desc').value = prefix + d.persona + (d.description ? ' – ' + d.description : '');
   document.getElementById('tx-type').value = txType;
@@ -3502,7 +3577,7 @@ function openHomeTxModal(id) {
   const del = document.getElementById('home-del-btn');
   // 1. Defaults
   document.getElementById('home-tx-id').value = '';
-  document.getElementById('home-tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('home-tx-date').value = getTodayInTimezone(getAppTimezone());
   document.getElementById('home-tx-amount').value = '';
   document.getElementById('home-tx-desc').value = '';
   document.getElementById('home-tx-type').value = 'expense';
@@ -3694,7 +3769,7 @@ function openDeudaModal(id) {
   } else {
     document.getElementById('deuda-modal-title').textContent = 'Nueva deuda';
     document.getElementById('deuda-id').value = '';
-    document.getElementById('deuda-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('deuda-date').value = getTodayInTimezone(getAppTimezone());
     document.getElementById('deuda-amount').value = '';
     document.getElementById('deuda-persona').value = '';
     document.getElementById('deuda-desc').value = '';
@@ -4668,7 +4743,7 @@ function openCustomTxModal(menuId, txId) {
   document.getElementById('home-modal-curr').textContent = '(' + m.currency + ')';
   // 1. Defaults
   document.getElementById('home-tx-id').value = '';
-  document.getElementById('home-tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('home-tx-date').value = getTodayInTimezone(getAppTimezone());
   document.getElementById('home-tx-amount').value = '';
   document.getElementById('home-tx-desc').value = '';
   document.getElementById('home-tx-type').value = 'expense';
@@ -5208,7 +5283,7 @@ document.getElementById('tx-modal').addEventListener('click', function(e) {
 // ============================================================
 // GESTIÓN DE CATEGORÍAS
 // ============================================================
-let currentCatsTab = 'inc'; // 'inc' | 'exp' | 'config'
+let currentCatsTab = 'inc'; // 'inc' | 'exp' | 'config' | 'timezone'
 
 function openCatsModal(tab) {
   currentCatsTab = tab || 'inc';
@@ -5230,14 +5305,44 @@ function switchCatsTab(tab) {
   document.querySelectorAll('.cats-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   resetCatForm();
   const isConfig = tab === 'config';
-  document.getElementById('cats-list-wrap').style.display = isConfig ? 'none' : 'block';
-  document.getElementById('cats-form').style.display      = isConfig ? 'none' : 'block';
+  const isTimezone = tab === 'timezone';
+  document.getElementById('cats-list-wrap').style.display = (isConfig || isTimezone) ? 'none' : 'block';
+  document.getElementById('cats-form').style.display      = (isConfig || isTimezone) ? 'none' : 'block';
   document.getElementById('cats-config-panel').style.display = isConfig ? 'block' : 'none';
-  if (isConfig) {
-    document.getElementById('config-home-curr').value = HOME_CURR.trim();
-  } else {
-    renderCatsList();
+  document.getElementById('cats-timezone-panel').style.display = isTimezone ? 'block' : 'none';
+  if (isTimezone) {
+      renderTimezoneSelector();
+  } else if (!isConfig) {
+      renderCatsList();
   }
+}
+
+function renderTimezoneSelector() {
+    const select = document.getElementById('timezone-selector');
+    if (!select) return;
+    // Limpiar opciones previas
+    select.innerHTML = '';
+    const options = getTimezoneOptions();
+    options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        select.appendChild(option);
+    });
+    const saved = getAppTimezone();
+    select.value = saved;
+    document.getElementById('timezone-status').textContent = 'Zona actual: ' + saved;
+}
+
+function saveTimezone() {
+    const select = document.getElementById('timezone-selector');
+    const newTz = select.value;
+    if (!APP_CONFIG) APP_CONFIG = {};
+    APP_CONFIG.timezone = newTz;
+    document.getElementById('timezone-status').textContent = '✅ Guardado: ' + newTz;
+    scheduleSave();
+    renderAll(); // Refresca todas las vistas con la nueva zona
+    showToast('🕒 Zona horaria actualizada a ' + newTz, 'var(--acc)');
 }
 
 function currentCatObj() {
@@ -5717,8 +5822,9 @@ function hideSearchResults() {
 // MEJORA A — DATE SEPARATORS in tables
 // ============================================================
 function formatDateLabel(ds) {
+  const tz = getAppTimezone();
   const d = new Date(ds + 'T12:00:00');
-  return d.toLocaleDateString('es', {weekday:'short', day:'numeric', month:'short', year:'numeric'});
+  return new Intl.DateTimeFormat('es', { timeZone: tz, weekday:'short', day:'numeric', month:'short', year:'numeric' }).format(d);
 }
 function renderRowsWithDateSep(list, rowFn, colspan) {
   if (!list.length) return `<tr><td colspan="${colspan}" class="empty">Sin registros</td></tr>`;
