@@ -1152,11 +1152,10 @@
     <div class="tbl-header">
       <h3>🏠 Registro del hogar <span class="home-curr" id="home-curr-label"></span></h3>
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-ghost" onclick="openMenuConfigModal(\'home\')" style="font-size:.75rem;padding:3px 8px" title="Mostrar/Ocultar elementos del menú">👁️ Elementos</button>
+        <button class="btn btn-ghost" onclick="openMenuConfigModal('home')" style="font-size:.75rem;padding:3px 8px" title="Mostrar/Ocultar elementos del menú">👁️ Elementos</button>
         <span id="home-count" style="font-size:.78rem;color:var(--text2)"></span>
         <button class="btn btn-ghost" onclick="exportHomeCSV()" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
         <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('home')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
-        <button class="btn btn-ghost" onclick="openMenuConfigModal('home')" style="font-size:.75rem;padding:3px 8px" title="Mostrar/Ocultar elementos del menú">👁️ Elementos</button>
       </div>
     </div>
     <div class="tbl-scroll"><table><thead id="home-thead"></thead>
@@ -1951,37 +1950,6 @@ function toggleMenuVisibility(menuId, key) {
     renderMenuConfigModal(menuId);
   }
 }
-//
-
-function openMenuConfigModal(menuId) {
-  _menuConfigMenuId = menuId;
-  renderMenuConfigModal(menuId);
-  document.getElementById('menu-config-modal').classList.add('open');
-}
-
-function closeMenuConfigModal() {
-  document.getElementById('menu-config-modal').classList.remove('open');
-  _menuConfigMenuId = null;
-}
-
-function renderMenuConfigModal(menuId) {
-  const vis = getMenuVisibility(menuId);
-  const labelMap = {
-    weekly: '📊 Gastos por semana',
-    monthlyChart: '📈 Ingresos vs Gastos',
-    categoryChart: '🍩 Gastos por categoría'
-  };
-  const body = document.getElementById('menu-config-body');
-  body.innerHTML = Object.keys(vis).map(key => {
-    const isVisible = vis[key];
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <span style="flex:1;font-size:.9rem">${labelMap[key]}</span>
-      <button onclick="toggleMenuVisibility('${menuId}','${key}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:.85rem;color:${isVisible?'var(--green)':'var(--red)'}">
-        ${isVisible ? '👁️ Visible' : '🙈 Oculto'}
-      </button>
-    </div>`;
-  }).join('');
-}
 
 // COL_DEFS: render functions for each column. 'actions' is always fixed-last, not in defs.
 // fn signatures: history/home/deudas receive the row object; custom receives (t, curr).
@@ -2302,10 +2270,7 @@ function initFromDrive(data) {
     if (c.menuVisibility) {
       localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
     }
-    if (c.menuVisibility) {
-      localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
   }
-  } 
   if (data && data.deletedIds) {
     // No registrar como tombstone IDs que existen en los datos recién cargados
     const liveLoaded = new Set([...txs.map(t=>t.id), ...homeTxs.map(t=>t.id), ...deudas.map(t=>t.id)]);
@@ -4453,12 +4418,19 @@ function buildSidebarNav() {
 // CUSTOM MENUS — BUILD & RENDER
 // ============================================================
 let _customMenusSnapshot = '';
-customMenus.forEach(m => {
-  // Inyectar vista HTML
-  const div = document.createElement('div');
-  div.id = 'view-custom-' + m.id;
-  div.className = 'view';
-  div.innerHTML = `
+function buildCustomMenuViews() {
+  const slot = document.getElementById('custom-views-slot');
+  const snapshot = JSON.stringify(customMenus.map(({charts,...r}) => r));
+  if (snapshot === _customMenusSnapshot && slot.children.length === customMenus.length) return;
+  _customMenusSnapshot = snapshot;
+  slot.innerHTML = '';
+
+  customMenus.forEach(m => {
+    // Inyectar vista HTML
+    const div = document.createElement('div');
+    div.id = 'view-custom-' + m.id;
+    div.className = 'view';
+    div.innerHTML = `
     <div class="month-tabs" id="cm-month-tabs-${m.id}" style="margin-bottom:14px"></div>
     <div class="cards" id="cm-cards-${m.id}"></div>
     <div class="weekly-wrap">
@@ -4494,21 +4466,20 @@ customMenus.forEach(m => {
       <div class="tbl-header">
         <h3>${m.icon} ${m.name} <span style="font-size:.72rem;color:var(--text2)">${m.currency}</span></h3>
         <div style="display:flex;align-items:center;gap:8px">
-          <button class="btn btn-ghost" onclick="openMenuConfigModal(\'custom-\'+m.id)" style="font-size:.75rem;padding:3px 8px" title="Mostrar/Ocultar elementos del menú">👁️ Elementos</button>
+          <button class="btn btn-ghost" onclick="openMenuConfigModal('custom-${m.id}')" style="font-size:.75rem;padding:3px 8px" title="Mostrar/Ocultar elementos del menú">👁️ Elementos</button>
           <span id="cm-count-${m.id}" style="font-size:.78rem;color:var(--text2)"></span>
           <button class="btn btn-ghost" onclick="exportCustomCSV(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Exportar CSV">⬇️ CSV</button>
           <button class="btn btn-ghost" onclick="openCSVImportModal(${m.id})" style="font-size:.75rem;padding:3px 8px" title="Importar CSV desde Excel">⬆ CSV</button>
           <button class="btn btn-ghost col-cfg-btn" onclick="openColConfig('custom')" style="font-size:.75rem;padding:3px 8px" title="Configurar columnas">⚙️ Columnas</button>
-          <button class="btn btn-ghost" onclick="openMenuConfigModal('custom-${m.id}')" style="font-size:.75rem;padding:3px 8px" title="Mostrar/Ocultar elementos del menú">👁️ Elementos</button>
         </div>
       </div>
       <div class="tbl-scroll"><table><thead id="cm-thead-${m.id}"></thead><tbody id="cm-tbody-${m.id}"></tbody></table></div>
     </div>`;
-  slot.appendChild(div);
+    slot.appendChild(div);
 
-  // Init chart holders
-  if (!customCharts[m.id]) customCharts[m.id] = {monthly:null, cat:null, weekly:null};
-});
+    // Init chart holders
+    if (!customCharts[m.id]) customCharts[m.id] = {monthly:null, cat:null, weekly:null};
+  });
 }
 
 function buildMoreDrawer() {
