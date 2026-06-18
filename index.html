@@ -2339,7 +2339,7 @@ function initFromDrive(data) {
   try {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder},
+      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,hiddenNavItems:hiddenNavItems,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder},
       deletedIds:[...deletedIds],
       deletedCustomRecords
     };
@@ -2614,7 +2614,7 @@ if (c.menuVisibility) {
     const _lsPayload = {
       version:1, transactions:txs, deudas, home:homeTxs,
       config:{globalCats,homeCurr:HOME_CURR,users,customMenus:customMenus.map(m=>{const{charts,...r}=m;return r;}),
-        navOrder,sessionSeed,budgets,savingsGoals,
+        navOrder,hiddenNavItems,sessionSeed,budgets,savingsGoals,
         colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs,dashCardOrder},
       deletedIds:[...deletedIds], deletedCustomRecords
     };
