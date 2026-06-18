@@ -3617,8 +3617,8 @@ function renderHome() {
   if (tp)  list = list.filter(t=>t.type===tp);
   if (cat) list = list.filter(t=>t.category===cat);
   if (mm)  list = list.filter(t=>t.date.substring(5,7)===mm);
-  if (df)  list = list.filter(t=>t.date>=df);
-  if (dt)  list = list.filter(t=>t.date<=dt);
+  if (df)  list = list.filter(t=>isDateFrom(t.date, df));
+  if (dt)  list = list.filter(t=>isDateTo(t.date, dt));
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
   const { order: hmOrd, hidden: hmHid } = getColConfig('home');
@@ -4781,8 +4781,8 @@ function renderCustomMenuView(menuId) {
   if (tp) list=list.filter(t=>t.type===tp);
   if (cat) list=list.filter(t=>t.category===cat);
   if (mm) list=list.filter(t=>t.date.substring(5,7)===mm);
-  if (df) list=list.filter(t=>t.date>=df);
-  if (dt) list=list.filter(t=>t.date<=dt);
+  if (df) list=list.filter(t=>isDateFrom(t.date, df));
+  if (dt) list=list.filter(t=>isDateTo(t.date, dt));
   list.sort((a,b)=>b.date.localeCompare(a.date) || b.id - a.id);
 
   const { order: cmOrd, hidden: cmHid } = getColConfig('custom');
@@ -5899,10 +5899,11 @@ function renderRowsWithDateSep(list, rowFn, colspan) {
   if (!list.length) return `<tr><td colspan="${colspan}" class="empty">Sin registros</td></tr>`;
   let lastDate = null;
   return list.map(t => {
+    const dk = dateOnly(t.date); // normalizar: quitar hora si la hay
     let sep = '';
-    if (t.date !== lastDate) {
-      sep = `<tr class="date-sep"><td colspan="${colspan}">📅 ${formatDateLabel(t.date)}</td></tr>`;
-      lastDate = t.date;
+    if (dk !== lastDate) {
+      sep = `<tr class="date-sep"><td colspan="${colspan}">📅 ${formatDateLabel(dk)}</td></tr>`;
+      lastDate = dk;
     }
     return sep + rowFn(t);
   }).join('');
