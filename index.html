@@ -2730,6 +2730,9 @@ function applyRemoteData(data) {
       const activeEl = document.getElementById(currentView);
       if (activeEl) activeEl.classList.add('active');
       renderNavForUser();
+      if (currentView && currentView.startsWith('view-custom-')) {
+        renderCustomMenuView(parseInt(currentView.replace('view-custom-', '')));
+      }
     }
     if (c.budgets) budgets = c.budgets;
     if (c.savingsGoals) { savingsGoals = c.savingsGoals; if (savingsGoals.length) _nextGoalId = Math.max(...savingsGoals.map(g=>g.id))+1; }
