@@ -2357,7 +2357,7 @@ function initFromDrive(data) {
     if (c.menuVisibility) {
       localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
     }
-    if (c.urlVersion) urlVersion = c.urlVersion;
+    if (c.urlVersion != null) urlVersion = c.urlVersion;
     if (c.backendUrl && c.backendUrl !== getApiUrl()) {
       localStorage.setItem('cashmap_api_url', c.backendUrl);
       _cachedApiUrl = c.backendUrl;
@@ -2390,12 +2390,9 @@ function initFromDrive(data) {
   if (data && data.lastUpdated) lastUpdatedStr = data.lastUpdated;
   // Señal de recarga forzada por admin
   const _ackReload = parseInt(localStorage.getItem('cashmap_force_reload_ack') || '0');
-  if (forceReloadTs > _ackReload && _ackReload > 0) {
+  if (forceReloadTs > _ackReload) {
     localStorage.setItem('cashmap_force_reload_ack', forceReloadTs.toString());
-    location.reload(); return;
-  }
-  if (forceReloadTs > 0 && _ackReload === 0) {
-    localStorage.setItem('cashmap_force_reload_ack', forceReloadTs.toString());
+    if (_ackReload > 0) { location.reload(); return; } // solo recarga si ya había reconocido un ts previo (evita loop en dispositivos nuevos donde urlVersion ya maneja el reload)
   }
   // Invalidación de URL del backend por admin
   const _localUrlVer = parseInt(localStorage.getItem('cashmap_url_version') || '0');
@@ -2506,7 +2503,23 @@ function mergeData(local, remote) {
     transactions: mergeArr(local.transactions, remote.transactions),
     deudas:       mergeArr(local.deudas,       remote.deudas),
     home:         mergeArr(local.home,          remote.home),
-    config:              { ...remote.config, ...local.config, customMenus: mergedMenus, navOrder: mergedNavOrder },
+    config:              (() => {
+      // Remote wins for shared config (users, globalCats, budgets, etc.)
+      // Local wins only for admin-managed fields where this device may have newer state
+      const lUrlV = local.config?.urlVersion || 0;
+      const rUrlV = remote.config?.urlVersion || 0;
+      return {
+        ...remote.config,
+        customMenus:  mergedMenus,
+        navOrder:     mergedNavOrder,
+        urlVersion:   Math.max(lUrlV, rUrlV),
+        // sessionSeed: local wins when local urlVersion is newer (admin just rotated)
+        sessionSeed:  lUrlV >= rUrlV
+          ? (local.config?.sessionSeed  || remote.config?.sessionSeed)
+          : (remote.config?.sessionSeed || local.config?.sessionSeed),
+        backendUrl:   local.config?.backendUrl || remote.config?.backendUrl,
+      };
+    })(),
     deletedIds:          [...allDel],
     deletedCustomRecords: mergedDCRClean,
     presence:     mergedPresence,
@@ -2678,7 +2691,7 @@ function applyRemoteData(data) {
 if (c.menuVisibility) {
   localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
 }
-    if (c.urlVersion) urlVersion = c.urlVersion;
+    if (c.urlVersion != null) urlVersion = c.urlVersion;
     if (c.backendUrl && c.backendUrl !== getApiUrl()) {
       localStorage.setItem('cashmap_api_url', c.backendUrl);
       _cachedApiUrl = c.backendUrl;
