@@ -1477,8 +1477,9 @@
         </div>
         <input type="hidden" id="uf-id">
       </div>
-      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px">
         <button class="btn btn-ghost" onclick="invalidateAllSessions()" style="color:var(--red);border-color:var(--red);font-size:.82rem;width:100%">🚪 Cerrar todas las sesiones activas</button>
+        <button class="btn btn-ghost" onclick="invalidateBackendUrl()" style="color:var(--red);border-color:var(--red);font-size:.82rem;width:100%">🔗 Invalidar URL del backend (forzar nueva URL en otros dispositivos)</button>
       </div>
     </div>
 
@@ -1990,6 +1991,7 @@ let customMenus = [];  // [{id, name, icon, currency, pin, access, catsInc, cats
 let navOrder = [];     // ['dashboard','deudas','home','custom-1',...]
 let hiddenNavItems = []; // menus estáticos/custom deshabilitados por admin
 let sessionSeed = ''; // token de invalidación global — si cambia, todas las sesiones expiran
+let urlVersion  = 0;  // versión de URL del backend; si sube, otros dispositivos deben re-ingresar la URL
 let budgets = {};     // {catKey: {monthly: amount}} — presupuesto mensual por categoría
 let savingsGoals = []; // [{id, name, icon, target, current, deadline, color}]
 let _nextGoalId  = 1;
@@ -2355,6 +2357,7 @@ function initFromDrive(data) {
     if (c.menuVisibility) {
       localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
     }
+    if (c.urlVersion) urlVersion = c.urlVersion;
     // Asegurar que existe la zona horaria (guardar la detectada si no está)
     if (!c.timezone) {
       const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -2390,13 +2393,21 @@ function initFromDrive(data) {
   if (forceReloadTs > 0 && _ackReload === 0) {
     localStorage.setItem('cashmap_force_reload_ack', forceReloadTs.toString());
   }
+  // Invalidación de URL del backend por admin
+  const _localUrlVer = parseInt(localStorage.getItem('cashmap_url_version') || '0');
+  if (urlVersion > _localUrlVer) {
+    localStorage.removeItem('cashmap_api_url');
+    localStorage.setItem('cashmap_url_version', urlVersion.toString());
+    _cachedApiUrl = undefined;
+    location.reload(); return;
+  }
   if (!data) scheduleSave();
 
   // Guardar en localStorage para acceso offline
   try {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,hiddenNavItems:hiddenNavItems,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder,timezone:APP_CONFIG?.timezone},
+      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,hiddenNavItems:hiddenNavItems,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder,timezone:APP_CONFIG?.timezone,urlVersion:urlVersion},
       deletedIds:[...deletedIds],
       deletedCustomRecords
     };
@@ -2509,7 +2520,7 @@ function pushToDrive() {
       globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, hiddenNavItems:hiddenNavItems, sessionSeed:sessionSeed, budgets:budgets, savingsGoals:savingsGoals,
       colConfig: JSON.parse(localStorage.getItem('cashmap_col_config') || '{}'),
       forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder, menuVisibility: JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}'),
-      timezone: getAppTimezone()
+      timezone: getAppTimezone(), urlVersion: urlVersion
     },
     transactions:txs, deudas:deudas, home:homeTxs,
     deletedIds: [...new Set(deletedIds)],
@@ -2663,6 +2674,15 @@ function applyRemoteData(data) {
 if (c.menuVisibility) {
   localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
 }
+    if (c.urlVersion) urlVersion = c.urlVersion;
+  }
+  // Invalidación de URL del backend por admin
+  const _remoteUrlVer = parseInt(localStorage.getItem('cashmap_url_version') || '0');
+  if (urlVersion > _remoteUrlVer) {
+    localStorage.removeItem('cashmap_api_url');
+    localStorage.setItem('cashmap_url_version', urlVersion.toString());
+    _cachedApiUrl = undefined;
+    location.reload(); return;
   }
   if (data.deletedIds) {
     // No importar tombstones globales para IDs que existen en memoria local (evita corrupción de otros dispositivos)
@@ -2688,7 +2708,7 @@ if (c.menuVisibility) {
       version:1, transactions:txs, deudas, home:homeTxs,
       config:{globalCats,homeCurr:HOME_CURR,users,customMenus:customMenus.map(m=>{const{charts,...r}=m;return r;}),
         navOrder,hiddenNavItems,sessionSeed,budgets,savingsGoals,
-        colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs,dashCardOrder},
+        colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs,dashCardOrder,urlVersion},
       deletedIds:[...deletedIds], deletedCustomRecords
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(_lsPayload));
@@ -4413,6 +4433,19 @@ function invalidateAllSessions() {
   currentUser = null;
   initAuth();
   }, {icon:'🚪', okLabel:'Cerrar sesiones'});
+}
+
+function invalidateBackendUrl() {
+  showConfirm('¿Invalidar la URL del backend para todos los demás dispositivos?\n\nEn su próximo acceso verán la pantalla de configuración y deberán ingresar la nueva URL.\n\nTú mantendrás tu URL configurada pero cerrarás sesión.', () => {
+    urlVersion = (urlVersion || 0) + 1;
+    sessionSeed = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    localStorage.setItem('cashmap_url_version', urlVersion.toString()); // admin queda exento
+    forceSave();
+    clearSession();
+    currentUser = null;
+    showToast('✅ URL invalidada — otros dispositivos verán pantalla de configuración al reconectarse');
+    initAuth();
+  }, {icon:'🔗', okLabel:'Invalidar URL'});
 }
 
 function logout() {
