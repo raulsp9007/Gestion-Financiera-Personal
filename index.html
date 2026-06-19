@@ -4444,15 +4444,14 @@ function invalidateAllSessions() {
 }
 
 function invalidateBackendUrl() {
-  showConfirm('¿Invalidar la URL del backend para todos los demás dispositivos?\n\nEn su próximo acceso verán la pantalla de configuración y deberán ingresar la nueva URL.\n\nTú mantendrás tu URL configurada pero cerrarás sesión.', () => {
+  showConfirm('¿Invalidar la URL del backend para todos los demás dispositivos?\n\nEn su próximo acceso (o en ~10 segundos si tienen la app abierta) verán la pantalla de configuración y deberán ingresar la nueva URL.\n\nEspera el ✅ en la barra de estado antes de cerrar la app.', () => {
     urlVersion = (urlVersion || 0) + 1;
     sessionSeed = Date.now().toString(36) + Math.random().toString(36).slice(2);
+    forceReloadTs = Date.now(); // señal adicional para forzar reload en otros dispositivos
     localStorage.setItem('cashmap_url_version', urlVersion.toString()); // admin queda exento
-    forceSave();
-    clearSession();
-    currentUser = null;
-    showToast('✅ URL invalidada — otros dispositivos verán pantalla de configuración al reconectarse');
-    initAuth();
+    localStorage.setItem('cashmap_force_reload_ack', forceReloadTs.toString()); // admin exento del reload
+    scheduleSave(); // usa debounce 900ms — admin ve ✅ antes de salir
+    showToast('🔗 Invalidación enviada — espera ✅ antes de cerrar la app. Otros dispositivos perderán acceso al detectar el cambio.', 'var(--yellow)', 8000);
   }, {icon:'🔗', okLabel:'Invalidar URL'});
 }
 
