@@ -2317,11 +2317,6 @@ function setSyncBadge(state, label) {
 }
 
 function initFromDrive(data) {
-  // Merge Drive data with localStorage so neither source loses recent edits
-  if (data && !data.error) {
-    const _cached = localStorage.getItem(CACHE_KEY);
-    if (_cached) { try { data = mergeData(JSON.parse(_cached), data); } catch(e) {} }
-  }
   if (data && data.error) {
     console.error('Error cargando Drive:', data.error);
     setSyncBadge('error', '⚠️ Error al cargar');
@@ -2434,17 +2429,19 @@ function initFromDrive(data) {
   }
   if (!data) scheduleSave();
 
-  // Guardar en localStorage para acceso offline
-  try {
-    const payload = {
-      version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,hiddenNavItems:hiddenNavItems,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder,timezone:APP_CONFIG?.timezone,urlVersion:urlVersion,backendUrl:getApiUrl()||''},
-      deletedIds:[...deletedIds],
-      deletedCustomRecords
-    };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-    localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
-  } catch(e) { /* localStorage no disponible */ }
+  // Guardar en localStorage solo en modo local (sin backend — Drive es la fuente de verdad)
+  if (!(inAppsScript || getApiUrl())) {
+    try {
+      const payload = {
+        version:1, transactions:txs, deudas:deudas, home:homeTxs,
+        config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,hiddenNavItems:hiddenNavItems,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder,timezone:APP_CONFIG?.timezone,urlVersion:urlVersion,backendUrl:getApiUrl()||''},
+        deletedIds:[...deletedIds],
+        deletedCustomRecords
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+      localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
+    } catch(e) {}
+  }
 
   // Hide skeleton
   document.body.classList.remove('loading-data');
@@ -2477,7 +2474,7 @@ function scheduleSave() {
   _pendingLocalChanges = true;
   setSyncBadge('pending');
   clearTimeout(saveTimeout);
-  _saveLocalSnapshot(); // protege contra recargas antes del push (900ms debounce)
+  if (!(inAppsScript || getApiUrl())) _saveLocalSnapshot(); // solo en modo local
   saveTimeout = setTimeout(pushToDrive, SAVE_DELAY);
 }
 
@@ -2591,12 +2588,6 @@ function pushToDrive() {
     presence: currentUser ? { ...onlinePresence, [currentUser.id]: { id:currentUser.id, name:currentUser.name, role:currentUser.role, lastSeen:new Date().toISOString() } } : onlinePresence
   };
 
-  // Siempre guardar en localStorage (offline backup)
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-    localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
-  } catch(e) {}
-
   // Sin conexión → marcar cambios pendientes
   if (!navigator.onLine) {
     pendingOfflineChanges = true;
@@ -2608,7 +2599,7 @@ function pushToDrive() {
   pendingOfflineChanges = false;
 
   const _doSave = (merged) => {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(merged)); localStorage.setItem(CACHE_TS_KEY, Date.now().toString()); } catch(e) {}
+    if (!(inAppsScript || getApiUrl())) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(merged)); localStorage.setItem(CACHE_TS_KEY, Date.now().toString()); } catch(e) {} }
     if (inAppsScript) {
       google.script.run
         .withSuccessHandler(r => {
@@ -2772,18 +2763,19 @@ if (c.menuVisibility) {
   }
   if (data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
   if (data.lastUpdated) lastUpdatedStr = data.lastUpdated;
-  try {
-    // Guardar estado en memoria (post-merge), no el dato crudo de Drive
-    const _lsPayload = {
-      version:1, transactions:txs, deudas, home:homeTxs,
-      config:{globalCats,homeCurr:HOME_CURR,users,customMenus:customMenus.map(m=>{const{charts,...r}=m;return r;}),
-        navOrder,hiddenNavItems,sessionSeed,budgets,savingsGoals,
-        colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs,dashCardOrder,urlVersion,backendUrl:getApiUrl()||''},
-      deletedIds:[...deletedIds], deletedCustomRecords
-    };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(_lsPayload));
-    localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
-  } catch(e) {}
+  if (!(inAppsScript || getApiUrl())) {
+    try {
+      const _lsPayload = {
+        version:1, transactions:txs, deudas, home:homeTxs,
+        config:{globalCats,homeCurr:HOME_CURR,users,customMenus:customMenus.map(m=>{const{charts,...r}=m;return r;}),
+          navOrder,hiddenNavItems,sessionSeed,budgets,savingsGoals,
+          colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs,dashCardOrder,urlVersion,backendUrl:getApiUrl()||''},
+        deletedIds:[...deletedIds], deletedCustomRecords
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(_lsPayload));
+      localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
+    } catch(e) {}
+  }
   _applyingRemote = false;
   renderAll();
   showToast('🔄 Datos actualizados', 'var(--green)', 2500);
@@ -2863,14 +2855,14 @@ window.onload = function() {
       setSyncBadge('loading');
       google.script.run
         .withSuccessHandler(initFromDrive)
-        .withFailureHandler(() => { setSyncBadge('error', '❌ Error de conexión'); tryOfflineCache(); })
+        .withFailureHandler(() => { setSyncBadge('error', '❌ Error de conexión'); initAuth(); })
         .loadData();
     } else if (getApiUrl()) {
       setSyncBadge('loading');
       fetch(getApiUrl() + '?action=load')
         .then(r => r.json())
         .then(initFromDrive)
-        .catch(() => { setSyncBadge('error', '❌ Sin conexión al servidor'); tryOfflineCache(); });
+        .catch(() => { setSyncBadge('error', '❌ Sin conexión al servidor'); initAuth(); });
     } else {
       setSyncBadge('local');
       tryOfflineCache();
@@ -2903,8 +2895,14 @@ window.onload = function() {
   document.getElementById('skeleton-overlay').style.display = 'block';
 
   if (!navigator.onLine) {
-    // Sin conexión desde el inicio
-    tryOfflineCache();
+    if (inAppsScript || getApiUrl()) {
+      // Modo Drive sin conexión → no hay datos disponibles
+      setSyncBadge('error', '❌ Sin conexión — app requiere internet');
+      showToast('Sin conexión a internet. Los datos no están disponibles.', 'var(--red)', 5000);
+      initAuth();
+    } else {
+      tryOfflineCache();
+    }
   } else {
     loadFromBackend();
   }
