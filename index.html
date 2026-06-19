@@ -2358,6 +2358,10 @@ function initFromDrive(data) {
       localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
     }
     if (c.urlVersion) urlVersion = c.urlVersion;
+    if (c.backendUrl && c.backendUrl !== getApiUrl()) {
+      localStorage.setItem('cashmap_api_url', c.backendUrl);
+      _cachedApiUrl = c.backendUrl;
+    }
     // Asegurar que existe la zona horaria (guardar la detectada si no está)
     if (!c.timezone) {
       const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -2407,7 +2411,7 @@ function initFromDrive(data) {
   try {
     const payload = {
       version:1, transactions:txs, deudas:deudas, home:homeTxs,
-      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,hiddenNavItems:hiddenNavItems,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder,timezone:APP_CONFIG?.timezone,urlVersion:urlVersion},
+      config:{globalCats:globalCats,homeCurr:HOME_CURR,users:users,customMenus:customMenus,navOrder:navOrder,hiddenNavItems:hiddenNavItems,sessionSeed:sessionSeed,budgets:budgets,savingsGoals:savingsGoals,colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs:forceReloadTs,dashCardOrder:dashCardOrder,timezone:APP_CONFIG?.timezone,urlVersion:urlVersion,backendUrl:getApiUrl()||''},
       deletedIds:[...deletedIds],
       deletedCustomRecords
     };
@@ -2520,7 +2524,7 @@ function pushToDrive() {
       globalCats:globalCats, homeCurr:HOME_CURR, users:users, customMenus:menusPayload, navOrder:navOrder, hiddenNavItems:hiddenNavItems, sessionSeed:sessionSeed, budgets:budgets, savingsGoals:savingsGoals,
       colConfig: JSON.parse(localStorage.getItem('cashmap_col_config') || '{}'),
       forceReloadTs: forceReloadTs, dashCardOrder: dashCardOrder, menuVisibility: JSON.parse(localStorage.getItem('cashmap_menu_visibility') || '{}'),
-      timezone: getAppTimezone(), urlVersion: urlVersion
+      timezone: getAppTimezone(), urlVersion: urlVersion, backendUrl: getApiUrl() || ''
     },
     transactions:txs, deudas:deudas, home:homeTxs,
     deletedIds: [...new Set(deletedIds)],
@@ -2675,6 +2679,10 @@ if (c.menuVisibility) {
   localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
 }
     if (c.urlVersion) urlVersion = c.urlVersion;
+    if (c.backendUrl && c.backendUrl !== getApiUrl()) {
+      localStorage.setItem('cashmap_api_url', c.backendUrl);
+      _cachedApiUrl = c.backendUrl;
+    }
   }
   // Invalidación de URL del backend por admin
   const _remoteUrlVer = parseInt(localStorage.getItem('cashmap_url_version') || '0');
@@ -2708,7 +2716,7 @@ if (c.menuVisibility) {
       version:1, transactions:txs, deudas, home:homeTxs,
       config:{globalCats,homeCurr:HOME_CURR,users,customMenus:customMenus.map(m=>{const{charts,...r}=m;return r;}),
         navOrder,hiddenNavItems,sessionSeed,budgets,savingsGoals,
-        colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs,dashCardOrder,urlVersion},
+        colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),forceReloadTs,dashCardOrder,urlVersion,backendUrl:getApiUrl()||''},
       deletedIds:[...deletedIds], deletedCustomRecords
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(_lsPayload));
@@ -5211,7 +5219,9 @@ function saveAdminBackendUrl() {
   if (!url) { showToast('URL vacía — usa "Cambiar a modo local" para desactivar el backend', 'var(--yellow)'); return; }
   if (!url.startsWith('https://')) { showToast('La URL debe empezar con https://', 'var(--red)'); return; }
   localStorage.setItem('cashmap_api_url', url);
-  showToast('URL guardada. Recarga para aplicar ✅');
+  _cachedApiUrl = url; // actualizar caché inmediatamente
+  forceSave(); // guarda a Drive (via nueva URL) con backendUrl en config — otros dispositivos la reciben en ~3s
+  showToast('✅ URL guardada y propagada a todos los dispositivos');
   renderBackendTab();
 }
 
