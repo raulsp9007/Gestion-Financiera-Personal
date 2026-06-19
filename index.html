@@ -2682,7 +2682,7 @@ function applyRemoteData(data) {
             });
             return Object.values(map);
           };
-          return { ...rm, data: mergeMenuData(lm.data || [], rm.data || []) };
+          return { ...rm, nextDataId: Math.max(lm.nextDataId||0, rm.nextDataId||0), data: mergeMenuData(lm.data || [], rm.data || []) };
         }),
         ...customMenus.filter(m => !remoteMenuIds.has(m.id) && !allDel.has(m.id))
       ];
@@ -3538,6 +3538,7 @@ function switchView(el) {
     const _fl = document.getElementById('fab-lbl'); if(_fl) _fl.textContent = 'Nuevo';
     document.getElementById('fab').title = 'Nuevo registro';
     document.getElementById('content').scrollTop = 0;
+    renderCustomMenuView(mid);
     return;
   }
   document.getElementById('topbar-title').textContent = titles[vId] || '';
