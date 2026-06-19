@@ -7121,7 +7121,12 @@ function doCSVImport() {
   if (!toImport.length) { showToast('No hay registros seleccionados', 'var(--red)'); return; }
 
   if (!m.nextDataId) m.nextDataId = (m.data || []).reduce((mx,x) => Math.max(mx, x.id), 0) + 1;
-  toImport.forEach(r => { m.data.push({ id: m.nextDataId++, ...r }); });
+  const _importTombs = new Set(deletedCustomRecords[_csvImportMenuId] || []);
+  const _importTs = new Date().toISOString();
+  toImport.forEach(r => {
+    while (_importTombs.has(m.nextDataId)) m.nextDataId++;
+    m.data.push({ id: m.nextDataId++, ...r, updatedAt: _importTs });
+  });
 
   closeCsvImportModal();
   renderCustomMenuView(_csvImportMenuId);
