@@ -700,6 +700,26 @@
       -webkit-tap-highlight-color:transparent;
     }
     #fab:active{transform:scale(.88);box-shadow:0 2px 8px rgba(59,130,246,.4)}
+    #fab-save{
+      display:none;
+      position:fixed;
+      bottom:calc(68px + env(safe-area-inset-bottom));
+      right:84px;
+      width:58px;height:58px;
+      border-radius:16px;
+      background:var(--green,#22c55e);
+      color:#fff;
+      font-size:1.1rem;
+      flex-direction:column;gap:1px;
+      align-items:center;justify-content:center;
+      cursor:pointer;border:none;z-index:600;
+      box-shadow:0 4px 20px rgba(34,197,94,.55);
+      transition:transform .1s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    #fab-save.visible{display:flex}
+    #fab-save:active{transform:scale(.88)}
+    #fab-save-lbl{font-size:.58rem;font-weight:700;letter-spacing:.3px;text-transform:uppercase;line-height:1}
 
     /* ── More drawer ─────────────────────────────────────────── */
     #more-drawer{
@@ -1786,6 +1806,7 @@
 
 <!-- FAB (mobile only) -->
 <button id="fab" onclick="handleNewBtn()" title="Nuevo"><span id="fab-ico">+</span><span id="fab-lbl">Nuevo</span></button>
+<button id="fab-save" onclick="forceSave()" title="Guardar ahora"><span>☁️</span><span id="fab-save-lbl">Guardar</span></button>
 
 <!-- ===== PWA: OFFLINE BAR ===== -->
 <div id="offline-bar">
@@ -2291,6 +2312,8 @@ function setSyncBadge(state, label) {
     syncing:'🔄 Sincronizando...'
   };
   lbl.textContent = label || labels[state] || state;
+  const fabSave = document.getElementById('fab-save');
+  if (fabSave) fabSave.classList.toggle('visible', state === 'pending');
 }
 
 function initFromDrive(data) {
@@ -2435,10 +2458,26 @@ function initFromDrive(data) {
   startSyncPoller();
 }
 
+function _saveLocalSnapshot() {
+  try {
+    const menusSnap = customMenus.map(m => { const {charts,...rest}=m; return rest; });
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      version:1, transactions:txs, deudas, home:homeTxs,
+      config:{globalCats,homeCurr:HOME_CURR,users,customMenus:menusSnap,navOrder,hiddenNavItems,
+              sessionSeed,budgets,savingsGoals,
+              colConfig:JSON.parse(localStorage.getItem('cashmap_col_config')||'{}'),
+              forceReloadTs,dashCardOrder,urlVersion,backendUrl:getApiUrl()||''},
+      deletedIds:[...deletedIds], deletedCustomRecords
+    }));
+    localStorage.setItem(CACHE_TS_KEY, Date.now().toString());
+  } catch(e) {}
+}
+
 function scheduleSave() {
   _pendingLocalChanges = true;
   setSyncBadge('pending');
   clearTimeout(saveTimeout);
+  _saveLocalSnapshot(); // protege contra recargas antes del push (900ms debounce)
   saveTimeout = setTimeout(pushToDrive, SAVE_DELAY);
 }
 
