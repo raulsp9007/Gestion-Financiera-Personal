@@ -2292,6 +2292,11 @@ function setSyncBadge(state, label) {
 }
 
 function initFromDrive(data) {
+  // Merge Drive data with localStorage so neither source loses recent edits
+  if (data && !data.error) {
+    const _cached = localStorage.getItem(CACHE_KEY);
+    if (_cached) { try { data = mergeData(JSON.parse(_cached), data); } catch(e) {} }
+  }
   if (data && data.error) {
     console.error('Error cargando Drive:', data.error);
     setSyncBadge('error', '⚠️ Error al cargar');
@@ -2424,7 +2429,11 @@ function mergeData(local, remote) {
   const mergeArr = (loc, rem) => {
     const map = {};
     (rem||[]).forEach(t => { if (!allDel.has(t.id)) map[t.id] = t; });
-    (loc||[]).forEach(t => { map[t.id] = t; }); // local siempre gana, jamás filtrado por tombstones remotos
+    (loc||[]).forEach(t => {
+      if (allDel.has(t.id)) return;
+      const prev = map[t.id];
+      if (!prev || (t.updatedAt || '') >= (prev.updatedAt || '')) map[t.id] = t;
+    });
     return Object.values(map);
   };
   // Merge deletedCustomRecords: unión de ambos lados
@@ -2447,7 +2456,11 @@ function mergeData(local, remote) {
       const mergeMenuData = (loc, rem) => {
         const map = {};
         (rem||[]).forEach(t => { if (!menuDel.has(t.id)) map[t.id] = t; });
-        (loc||[]).forEach(t => { map[t.id] = t; }); // local es autoritativo, nunca filtrado por tombstones remotos
+        (loc||[]).forEach(t => {
+          if (menuDel.has(t.id)) return;
+          const prev = map[t.id];
+          if (!prev || (t.updatedAt || '') >= (prev.updatedAt || '')) map[t.id] = t;
+        });
         return Object.values(map);
       };
       return { ...rm, data: mergeMenuData(lm?.data||[], rm.data||[]) };
@@ -2590,13 +2603,16 @@ function applyRemoteData(data) {
   if (_pendingLocalChanges) return;
   if (_applyingRemote) return;
   _applyingRemote = true;
-  // Merge en vez de replace: local gana mismo id, remoto aporta registros nuevos
-  // Usa solo tombstones locales (deletedIds pre-merge) para no importar corrupciones remotas
+  // Merge: tombstones locales bloquean ambos lados; updatedAt decide ganador en conflicto
   const _safeMerge = (loc, rem) => {
     const localDel = new Set(deletedIds);
     const map = {};
     (rem||[]).forEach(t => { if (!localDel.has(t.id)) map[t.id] = t; });
-    (loc||[]).forEach(t => { map[t.id] = t; }); // local siempre gana
+    (loc||[]).forEach(t => {
+      if (localDel.has(t.id)) return;
+      const prev = map[t.id];
+      if (!prev || (t.updatedAt || '') >= (prev.updatedAt || '')) map[t.id] = t;
+    });
     return Object.values(map);
   };
   if (Array.isArray(data.transactions)) txs = _safeMerge(txs, data.transactions);
@@ -2619,12 +2635,16 @@ function applyRemoteData(data) {
         ...c.customMenus.map(rm => {
           const lm = customMenus.find(x => x.id === rm.id);
           if (!lm) return rm; // menú nuevo en Drive — tomar completo
-          // Solo tombstones locales para filtrar remotos — incoming nunca elimina lo que ya tenemos local
+          // Tombstones locales bloquean ambos lados; updatedAt decide ganador en conflicto
           const localMenuDel = new Set(deletedCustomRecords[rm.id] || []);
           const mergeMenuData = (loc, rem) => {
             const map = {};
             (rem||[]).forEach(t => { if (!localMenuDel.has(t.id)) map[t.id] = t; });
-            (loc||[]).forEach(t => { map[t.id] = t; }); // local siempre gana, jamás eliminado por tombstones remotos
+            (loc||[]).forEach(t => {
+              if (localMenuDel.has(t.id)) return;
+              const prev = map[t.id];
+              if (!prev || (t.updatedAt || '') >= (prev.updatedAt || '')) map[t.id] = t;
+            });
             return Object.values(map);
           };
           return { ...rm, data: mergeMenuData(lm.data || [], rm.data || []) };
@@ -3358,11 +3378,11 @@ function saveTx() {
   if (id) {
     const idx = txs.findIndex(t=>t.id===parseInt(id));
     if (idx >= 0) {
-      txs[idx] = {id:parseInt(id),date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments]};
+      txs[idx] = {id:parseInt(id),date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments],updatedAt:new Date().toISOString()};
       if (recurring) txs[idx].recurringNext = recurringNext;
     }
   } else {
-    const tx = {id:nextId++,date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments]};
+    const tx = {id:nextId++,date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments],updatedAt:new Date().toISOString()};
     if (recurring) tx.recurringNext = recurringNext;
     txs.push(tx);
   }
@@ -3710,12 +3730,12 @@ function saveHomeTx() {
   if (id) {
     const idx = homeTxs.findIndex(t=>t.id===parseInt(id));
     if (idx >= 0) {
-      homeTxs[idx] = { ...homeTxs[idx], date, amount, description:desc, type, category:cat, notes, recurring, attachments:[..._modalAttachments] };
+      homeTxs[idx] = { ...homeTxs[idx], date, amount, description:desc, type, category:cat, notes, recurring, attachments:[..._modalAttachments], updatedAt:new Date().toISOString() };
       if (recurring) homeTxs[idx].recurringNext = recurringNext;
       else delete homeTxs[idx].recurringNext;
     }
   } else {
-    const tx = { id:nextHomeId++, date, amount, description:desc, type, category:cat, notes, recurring, attachments:[..._modalAttachments] };
+    const tx = { id:nextHomeId++, date, amount, description:desc, type, category:cat, notes, recurring, attachments:[..._modalAttachments], updatedAt:new Date().toISOString() };
     if (recurring) tx.recurringNext = recurringNext;
     homeTxs.push(tx);
   }
@@ -3879,10 +3899,10 @@ function saveDeuda() {
     // Edición: preservar pagos existentes, solo actualizar campos del encabezado
     const idx = deudas.findIndex(d=>d.id===parseInt(id));
     if (idx >= 0) {
-      deudas[idx] = { ...deudas[idx], date, amount, persona, description: desc, type, status, notes, currency };
+      deudas[idx] = { ...deudas[idx], date, amount, persona, description: desc, type, status, notes, currency, updatedAt:new Date().toISOString() };
     }
   } else {
-    deudas.push({ id: nextDeudaId++, date, amount, persona, description: desc, type, status, notes, currency, paid: 0, payments: [] });
+    deudas.push({ id: nextDeudaId++, date, amount, persona, description: desc, type, status, notes, currency, paid: 0, payments: [], updatedAt:new Date().toISOString() });
   }
 
   closeDeudaModal();
@@ -4001,6 +4021,7 @@ function savePago() {
 
   // Recalcular paid desde cero (fuente de verdad = array payments)
   recalcDeudaPaid(d);
+  d.updatedAt = new Date().toISOString();
 
   closePagoModal();
   renderDeudas();   // garantía directa — tabla siempre actualiza
@@ -4869,12 +4890,12 @@ function saveCustomTx(menuId) {
   if (id) {
     const idx = m.data.findIndex(t=>t.id===parseInt(id));
     if (idx>=0) {
-      m.data[idx]={...m.data[idx],date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments]};
+      m.data[idx]={...m.data[idx],date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments],updatedAt:new Date().toISOString()};
       if (recurring) m.data[idx].recurringNext = recurringNext;
       else delete m.data[idx].recurringNext;
     }
   } else {
-    const tx={id:m.nextDataId++,date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments]};
+    const tx={id:m.nextDataId++,date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments],updatedAt:new Date().toISOString()};
     if (recurring) tx.recurringNext = recurringNext;
     m.data.push(tx);
   }
