@@ -6677,8 +6677,8 @@ function handleAttachUpload(input) {
     } else {
       const url = getApiUrl();
       if (!url) { onErr(); return; }
-      fetch(url + '?action=uploadAttachment', { method:'POST', headers:{'Content-Type':'text/plain;charset=UTF-8'},
-        body: JSON.stringify({ fileName:file.name, mimeType:file.type, base64Data:base64 }) })
+      fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=UTF-8'},
+        body: JSON.stringify({ action:'uploadAttachment', fileName:file.name, mimeType:file.type, base64Data:base64 }) })
         .then(r => r.json()).then(onOk).catch(onErr);
     }
   };
