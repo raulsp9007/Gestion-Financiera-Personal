@@ -2502,7 +2502,7 @@ function mergeData(local, remote) {
     transactions: mergeArr(local.transactions, remote.transactions),
     deudas:       mergeArr(local.deudas,       remote.deudas),
     home:         mergeArr(local.home,          remote.home),
-    config:              { ...remote.config, customMenus: mergedMenus, navOrder: mergedNavOrder },
+    config:              { ...remote.config, ...local.config, customMenus: mergedMenus, navOrder: mergedNavOrder },
     deletedIds:          [...allDel],
     deletedCustomRecords: mergedDCRClean,
     presence:     mergedPresence,
