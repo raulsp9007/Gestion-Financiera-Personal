@@ -2361,12 +2361,13 @@ function initFromDrive(data) {
     if (c.customMenus && c.customMenus.length) {
       customMenus = c.customMenus;
       nextMenuId = Math.max(...customMenus.map(m=>m.id))+1;
-      // Auto-sanar nextDataId corrupto: debe ser mayor que el ID más alto en data
+      // Auto-sanar nextDataId: debe superar tanto el ID más alto en data como los tombstones
+      const _incomingTombs = (data && data.deletedCustomRecords) || {};
       customMenus.forEach(m => {
-        if (m.data && m.data.length) {
-          const maxId = m.data.reduce((mx, t) => Math.max(mx, t.id || 0), 0);
-          if ((m.nextDataId || 0) <= maxId) { m.nextDataId = maxId + 1; scheduleSave(); }
-        }
+        const maxDataId = (m.data || []).reduce((mx, t) => Math.max(mx, t.id || 0), 0);
+        const maxTombId = (_incomingTombs[m.id] || []).reduce((mx, id) => Math.max(mx, id || 0), 0);
+        const safeNext = Math.max(maxDataId, maxTombId) + 1;
+        if ((m.nextDataId || 0) < safeNext) { m.nextDataId = safeNext; scheduleSave(); }
       });
     }
     if (c.navOrder && c.navOrder.length) navOrder = c.navOrder;
@@ -4986,6 +4987,11 @@ function saveCustomTx(menuId) {
   if (!date || isNaN(amount) || amount<=0 || !desc) { alert('Completa fecha, monto y descripción.'); return; }
   if (!m.data) m.data = [];
   if (!m.nextDataId) m.nextDataId = 1;
+  // Saltar IDs que coinciden con tombstones para evitar que el registro sea filtrado
+  if (!id) {
+    const _tombs = new Set(deletedCustomRecords[menuId] || []);
+    while (_tombs.has(m.nextDataId)) m.nextDataId++;
+  }
   _attachSaved = true;
   const recurringNext = recurring ? nextOccurrence(date, recurring) : undefined;
   if (id) {
@@ -5773,6 +5779,14 @@ function initPWA() {
   // Monitor de conectividad
   window.addEventListener('online',  onNetworkChange);
   window.addEventListener('offline', onNetworkChange);
+
+  // Móvil: push inmediato cuando el tab pasa a background (el OS puede matar la pestaña)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && _pendingLocalChanges && (inAppsScript || getApiUrl())) {
+      clearTimeout(saveTimeout);
+      pushToDrive();
+    }
+  });
 }
 
 function onNetworkChange() {
