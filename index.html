@@ -2343,6 +2343,13 @@ function initFromDrive(data) {
     if (c.customMenus && c.customMenus.length) {
       customMenus = c.customMenus;
       nextMenuId = Math.max(...customMenus.map(m=>m.id))+1;
+      // Auto-sanar nextDataId corrupto: debe ser mayor que el ID más alto en data
+      customMenus.forEach(m => {
+        if (m.data && m.data.length) {
+          const maxId = m.data.reduce((mx, t) => Math.max(mx, t.id || 0), 0);
+          if ((m.nextDataId || 0) <= maxId) { m.nextDataId = maxId + 1; scheduleSave(); }
+        }
+      });
     }
     if (c.navOrder && c.navOrder.length) navOrder = c.navOrder;
     if (c.hiddenNavItems) hiddenNavItems = c.hiddenNavItems;
