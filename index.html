@@ -6669,7 +6669,7 @@ function handleAttachUpload(input) {
         _modalAttachments.push(att);
         _modalNewAttachments.push(att);
         renderAttachmentList();
-      } else { alert('Error al subir archivo: ' + (r?.error || 'desconocido')); }
+      } else { console.error('[CashMap] uploadAttachment response:', JSON.stringify(r)); alert('Error al subir archivo: ' + (r?.error || r?.message || JSON.stringify(r) || 'desconocido')); }
     };
     const onErr = () => { _attachSetUploading(false); input.value = ''; alert('Error de red al subir archivo.'); };
     if (inAppsScript) {
