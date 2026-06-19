@@ -2475,7 +2475,7 @@ function mergeData(local, remote) {
         });
         return Object.values(map);
       };
-      return { ...rm, data: mergeMenuData(lm?.data||[], rm.data||[]) };
+      return { ...rm, nextDataId: Math.max(lm?.nextDataId||0, rm.nextDataId||0), data: mergeMenuData(lm?.data||[], rm.data||[]) };
     }),
     ...(local.config?.customMenus||[]).filter(lm => !remoteMenuIds.has(lm.id))
   ];
