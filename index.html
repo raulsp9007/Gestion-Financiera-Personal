@@ -2280,6 +2280,7 @@ let _pollTimer = null;
 let _pendingLocalChanges = false;
 let deletedIds = []; // tombstone txs/deudas/home (IDs globales)
 let deletedCustomRecords = {}; // tombstone records de menús custom: {menuId: [recordId, ...]}
+let deletedMenuIds = []; // tombstone menús custom eliminados (IDs de menú)
 let onlinePresence = {}; // { userId: { id, name, role, lastSeen } }
 let _applyingRemote = false;
 let _renderPending = false;
@@ -2403,6 +2404,9 @@ function initFromDrive(data) {
     const safeDel = data.deletedIds.filter(id => !liveLoaded.has(id));
     deletedIds = [...new Set([...deletedIds, ...safeDel])];
   }
+  if (data && data.deletedMenuIds) {
+    deletedMenuIds = [...new Set([...deletedMenuIds, ...data.deletedMenuIds])];
+  }
   if (data && data.deletedCustomRecords) {
     Object.entries(data.deletedCustomRecords).forEach(([mid, ids]) => {
       if (!deletedCustomRecords[mid]) deletedCustomRecords[mid] = [];
@@ -2504,9 +2508,10 @@ function mergeData(local, remote) {
   const mergedDCRFinal = {};
   Object.entries(mergedDCR).forEach(([k,s]) => { mergedDCRFinal[k] = [...s]; });
 
+  const allDelMenus = new Set([...(local.deletedMenuIds||[]), ...(remote.deletedMenuIds||[])]);
   const remoteMenuIds = new Set((remote.config?.customMenus||[]).map(m => m.id));
   const mergedMenus = [
-    ...(remote.config?.customMenus||[]).map(rm => {
+    ...(remote.config?.customMenus||[]).filter(rm => !allDelMenus.has(rm.id)).map(rm => {
       const lm = (local.config?.customMenus||[]).find(x => x.id === rm.id);
       // Tombstones específicos de este menú — no mezclar con IDs globales
       const menuDel = mergedDCR[rm.id] || new Set();
@@ -2522,7 +2527,7 @@ function mergeData(local, remote) {
       };
       return { ...rm, nextDataId: Math.max(lm?.nextDataId||0, rm.nextDataId||0), data: mergeMenuData(lm?.data||[], rm.data||[]) };
     }),
-    ...(local.config?.customMenus||[]).filter(lm => !remoteMenuIds.has(lm.id))
+    ...(local.config?.customMenus||[]).filter(lm => !remoteMenuIds.has(lm.id) && !allDelMenus.has(lm.id))
   ];
   // navOrder: remote order + any local-only keys (e.g. newly created menu not yet in Drive)
   const remoteNavSet = new Set(remote.config?.navOrder || []);
@@ -2555,9 +2560,10 @@ function mergeData(local, remote) {
       const rUrlV = remote.config?.urlVersion || 0;
       return {
         ...remote.config,
-        customMenus:  mergedMenus,
-        navOrder:     mergedNavOrder,
-        urlVersion:   Math.max(lUrlV, rUrlV),
+        customMenus:    mergedMenus,
+        navOrder:       mergedNavOrder,
+        hiddenNavItems: local.config?.hiddenNavItems ?? remote.config?.hiddenNavItems ?? [],
+        urlVersion:     Math.max(lUrlV, rUrlV),
         // sessionSeed: local wins when local urlVersion is newer (admin just rotated)
         sessionSeed:  lUrlV >= rUrlV
           ? (local.config?.sessionSeed  || remote.config?.sessionSeed)
@@ -2567,6 +2573,7 @@ function mergeData(local, remote) {
     })(),
     deletedIds:          [...allDel],
     deletedCustomRecords: mergedDCRClean,
+    deletedMenuIds:      [...allDelMenus],
     presence:     mergedPresence,
     lastUpdated:  new Date().toISOString()
   };
@@ -2587,6 +2594,7 @@ function pushToDrive() {
     transactions:txs, deudas:deudas, home:homeTxs,
     deletedIds: [...new Set(deletedIds)],
     deletedCustomRecords,
+    deletedMenuIds: [...new Set(deletedMenuIds)],
     presence: currentUser ? { ...onlinePresence, [currentUser.id]: { id:currentUser.id, name:currentUser.name, role:currentUser.role, lastSeen:new Date().toISOString() } } : onlinePresence
   };
 
@@ -2694,12 +2702,16 @@ function applyRemoteData(data) {
       navOrder = [...c.navOrder, ...navOrder.filter(k => !remoteNavSet.has(k))];
     }
     if (c.hiddenNavItems) hiddenNavItems = c.hiddenNavItems;
+    if (data.deletedMenuIds) {
+      deletedMenuIds = [...new Set([...deletedMenuIds, ...data.deletedMenuIds])];
+    }
     if (c.customMenus) {
       const allDel = new Set(deletedIds);
+      const allDelMenus = new Set(deletedMenuIds);
       const remoteMenuIds = new Set(c.customMenus.map(m => m.id));
       const incomingDCR = data.deletedCustomRecords || {};
       customMenus = [
-        ...c.customMenus.map(rm => {
+        ...c.customMenus.filter(rm => !allDelMenus.has(rm.id)).map(rm => {
           const lm = customMenus.find(x => x.id === rm.id);
           if (!lm) return rm; // menú nuevo en Drive — tomar completo
           // Tombstones locales bloquean ambos lados; updatedAt decide ganador en conflicto
@@ -2716,7 +2728,7 @@ function applyRemoteData(data) {
           };
           return { ...rm, nextDataId: Math.max(lm.nextDataId||0, rm.nextDataId||0), data: mergeMenuData(lm.data || [], rm.data || []) };
         }),
-        ...customMenus.filter(m => !remoteMenuIds.has(m.id) && !allDel.has(m.id))
+        ...customMenus.filter(m => !remoteMenuIds.has(m.id) && !allDel.has(m.id) && !allDelMenus.has(m.id))
       ];
       buildCustomMenuViews();
       // Restaurar vista activa — buildCustomMenuViews destruye el DOM de custom views
@@ -5464,6 +5476,7 @@ function saveCustomMenu() {
 function deleteCustomMenu(id) {
   const m = customMenus.find(x=>x.id===id);
   showConfirm(`¿Eliminar el menú "${m?m.name:'este menú'}" y todos sus datos?`, ()=>{
+  deletedMenuIds = [...new Set([...deletedMenuIds, id])];
   customMenus = customMenus.filter(m=>m.id!==id);
   delete customCharts[id];
   renderMenusList();
