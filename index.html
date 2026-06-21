@@ -3553,6 +3553,7 @@ function saveTx() {
   }
 
   const recurringNext = recurring ? nextOccurrence(date, recurring) : undefined;
+  if (recurring && !recurringNext) { alert('Fecha inválida para calcular recurrencia.'); return; }
 
   _attachSaved = true;
   if (id) {
@@ -3908,6 +3909,7 @@ function saveHomeTx() {
   }
   _attachSaved = true;
   const recurringNext = recurring ? nextOccurrence(date, recurring) : undefined;
+  if (recurring && !recurringNext) { alert('Fecha inválida para calcular recurrencia.'); return; }
   if (id) {
     const idx = homeTxs.findIndex(t=>t.id===parseInt(id));
     if (idx >= 0) {
@@ -5085,6 +5087,7 @@ function saveCustomTx(menuId) {
   }
   _attachSaved = true;
   const recurringNext = recurring ? nextOccurrence(date, recurring) : undefined;
+  if (recurring && !recurringNext) { alert('Fecha inválida para calcular recurrencia.'); return; }
   if (id) {
     const idx = m.data.findIndex(t=>t.id===parseInt(id));
     if (idx>=0) {
@@ -6388,10 +6391,12 @@ function checkRecurringReminders() {
 // RECURRENCIA AUTOMÁTICA
 // ============================================================
 function nextOccurrence(dateStr, period) {
-  const d = new Date(dateStr + 'T12:00:00');
-  if (period === 'semanal')  d.setDate(d.getDate() + 7);
-  else if (period === 'mensual') d.setMonth(d.getMonth() + 1);
-  else if (period === 'anual')   d.setFullYear(d.getFullYear() + 1);
+  if (!dateStr) return null;
+  const d = new Date(dateStr.length === 10 ? dateStr + 'T12:00:00' : dateStr);
+  if (isNaN(d.getTime())) return null;
+  if (period === 'semanal')       d.setDate(d.getDate() + 7);
+  else if (period === 'mensual')  d.setMonth(d.getMonth() + 1);
+  else if (period === 'anual')    d.setFullYear(d.getFullYear() + 1);
   return d.toISOString().split('T')[0];
 }
 
