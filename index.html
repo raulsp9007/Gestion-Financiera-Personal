@@ -2550,98 +2550,130 @@ function scheduleSave() {
   saveTimeout = setTimeout(pushToDrive, SAVE_DELAY);
 }
 
-function mergeData(local, remote) {
-  if (!remote || remote.error || !remote.transactions) return local;
-  const allDel = new Set([...(local.deletedIds||[]), ...(remote.deletedIds||[])]);
-  const mergeArr = (loc, rem) => {
-    const map = {};
-    (rem||[]).forEach(t => { if (!allDel.has(t.id)) map[t.id] = t; });
-    (loc||[]).forEach(t => {
-      if (allDel.has(t.id)) return;
-      const prev = map[t.id];
-      if (!prev || (t.updatedAt || '') >= (prev.updatedAt || '')) map[t.id] = t;
-    });
-    return Object.values(map);
-  };
-  // Merge deletedCustomRecords: unión de ambos lados
-  const mergedDCR = {};
-  [local.deletedCustomRecords||{}, remote.deletedCustomRecords||{}].forEach(dcr => {
+// ── Merge helpers compartidos (usados por mergeData y applyRemoteData) ───────
+
+// Merge dos arrays de registros: updatedAt gana; tombstoneSet filtra ambos lados.
+function _mergeRecords(loc, rem, tombstoneSet) {
+  const map = {};
+  (rem||[]).forEach(t => { if (!tombstoneSet.has(t.id)) map[t.id] = t; });
+  (loc||[]).forEach(t => {
+    if (tombstoneSet.has(t.id)) return;
+    const prev = map[t.id];
+    if (!prev || (t.updatedAt || '') >= (prev.updatedAt || '')) map[t.id] = t;
+  });
+  return Object.values(map);
+}
+
+// Unión de deletedCustomRecords de dos fuentes. Devuelve {menuId: Set<recordId>}.
+function _unionDCR(a, b) {
+  const merged = {};
+  [a||{}, b||{}].forEach(dcr => {
     Object.entries(dcr).forEach(([mid, ids]) => {
-      if (!mergedDCR[mid]) mergedDCR[mid] = new Set();
-      ids.forEach(id => mergedDCR[mid].add(id));
+      if (!merged[mid]) merged[mid] = new Set();
+      ids.forEach(id => merged[mid].add(id));
     });
   });
-  const mergedDCRFinal = {};
-  Object.entries(mergedDCR).forEach(([k,s]) => { mergedDCRFinal[k] = [...s]; });
+  return merged;
+}
 
-  const allDelMenus = new Set([...(local.deletedMenuIds||[]), ...(remote.deletedMenuIds||[])]);
-  const remoteMenuIds = new Set((remote.config?.customMenus||[]).map(m => m.id));
-  const mergedMenus = [
-    ...(remote.config?.customMenus||[]).filter(rm => !allDelMenus.has(rm.id)).map(rm => {
-      const lm = (local.config?.customMenus||[]).find(x => x.id === rm.id);
-      // Tombstones específicos de este menú — no mezclar con IDs globales
-      const menuDel = mergedDCR[rm.id] || new Set();
-      const mergeMenuData = (loc, rem) => {
-        const map = {};
-        (rem||[]).forEach(t => { if (!menuDel.has(t.id)) map[t.id] = t; });
-        (loc||[]).forEach(t => {
-          if (menuDel.has(t.id)) return;
-          const prev = map[t.id];
-          if (!prev || (t.updatedAt || '') >= (prev.updatedAt || '')) map[t.id] = t;
-        });
-        return Object.values(map);
+// Merge lista de custom menus.
+// dcrSets: {menuId: Set<recordId>} — tombstones por menú (local o union según contexto).
+function _mergeCustomMenusList(localMenus, remoteMenus, tombstonedMenuIds, dcrSets) {
+  const remoteMenuIds = new Set(remoteMenus.map(m => m.id));
+  return [
+    ...remoteMenus.filter(rm => !tombstonedMenuIds.has(rm.id)).map(rm => {
+      const lm = localMenus.find(x => x.id === rm.id);
+      if (!lm) return rm; // menú nuevo en Drive — tomar completo
+      const menuTombs = dcrSets[rm.id] || new Set();
+      return {
+        ...rm,
+        nextDataId: Math.max(lm.nextDataId||0, rm.nextDataId||0),
+        data: _mergeRecords(lm.data||[], rm.data||[], menuTombs)
       };
-      return { ...rm, nextDataId: Math.max(lm?.nextDataId||0, rm.nextDataId||0), data: mergeMenuData(lm?.data||[], rm.data||[]) };
     }),
-    ...(local.config?.customMenus||[]).filter(lm => !remoteMenuIds.has(lm.id) && !allDelMenus.has(lm.id))
+    ...localMenus.filter(m => !remoteMenuIds.has(m.id) && !tombstonedMenuIds.has(m.id))
   ];
-  // navOrder: remote order + any local-only keys (e.g. newly created menu not yet in Drive)
+}
+
+// ── mergeData: merge completo antes de push a Drive ──────────────────────────
+function mergeData(local, remote) {
+  if (!remote || remote.error || !remote.transactions) return local;
+
+  // Tombstones: unión de ambos lados (para el push, todos los tombstones deben persistir)
+  const allDel      = new Set([...(local.deletedIds||[]),    ...(remote.deletedIds||[])]);
+  const allDelMenus = new Set([...(local.deletedMenuIds||[]), ...(remote.deletedMenuIds||[])]);
+  const mergedDCR   = _unionDCR(local.deletedCustomRecords, remote.deletedCustomRecords);
+  const mergedDCRArr = {};
+  Object.entries(mergedDCR).forEach(([k,s]) => { mergedDCRArr[k] = [...s]; });
+
+  // Datos: updatedAt gana, tombstones filtran ambos lados
+  const mergedTxs    = _mergeRecords(local.transactions, remote.transactions, allDel);
+  const mergedDeudas = _mergeRecords(local.deudas,       remote.deudas,       allDel);
+  const mergedHome   = _mergeRecords(local.home,          remote.home,         allDel);
+  const mergedMenus  = _mergeCustomMenusList(
+    local.config?.customMenus||[], remote.config?.customMenus||[], allDelMenus, mergedDCR
+  );
+
+  // Limpiar tombstones DCR para IDs que sobrevivieron (auto-sanación)
+  const mergedDCRClean = {};
+  Object.entries(mergedDCRArr).forEach(([mid, ids]) => {
+    const menu = mergedMenus.find(m => m.id === parseInt(mid));
+    const liveIds = new Set((menu?.data || []).map(t => t.id));
+    mergedDCRClean[mid] = ids.filter(id => !liveIds.has(id));
+  });
+
+  // navOrder: remote define el orden base; local añade keys nuevos al final
   const remoteNavSet = new Set(remote.config?.navOrder || []);
   const mergedNavOrder = [
     ...(remote.config?.navOrder || []),
     ...(local.config?.navOrder || []).filter(k => !remoteNavSet.has(k))
   ];
+
+  // Presence: lastSeen más reciente gana por usuario
   const mergedPresence = {};
   [remote.presence, local.presence].forEach(p => {
     Object.entries(p || {}).forEach(([uid, val]) => {
       if (!mergedPresence[uid] || val.lastSeen > mergedPresence[uid].lastSeen) mergedPresence[uid] = val;
     });
   });
-  // Limpiar tombstones para IDs que sobrevivieron en mergedMenus (auto-sanación del DCR corrupto)
-  const mergedDCRClean = {};
-  Object.entries(mergedDCRFinal).forEach(([mid, ids]) => {
-    const menu = mergedMenus.find(m => m.id === parseInt(mid));
-    const liveIds = new Set((menu?.data || []).map(t => t.id));
-    mergedDCRClean[mid] = ids.filter(id => !liveIds.has(id));
-  });
+
+  const lUrlV = local.config?.urlVersion || 0;
+  const rUrlV = remote.config?.urlVersion || 0;
+
   return {
     ...remote,
-    transactions: mergeArr(local.transactions, remote.transactions),
-    deudas:       mergeArr(local.deudas,       remote.deudas),
-    home:         mergeArr(local.home,          remote.home),
-    config:              (() => {
-      // Remote wins for shared config (users, globalCats, budgets, etc.)
-      // Local wins only for admin-managed fields where this device may have newer state
-      const lUrlV = local.config?.urlVersion || 0;
-      const rUrlV = remote.config?.urlVersion || 0;
-      return {
-        ...remote.config,
-        customMenus:    mergedMenus,
-        navOrder:       mergedNavOrder,
-        hiddenNavItems: local.config?.hiddenNavItems ?? remote.config?.hiddenNavItems ?? [],
-        urlVersion:     Math.max(lUrlV, rUrlV),
-        // sessionSeed: local wins when local urlVersion is newer (admin just rotated)
-        sessionSeed:  lUrlV >= rUrlV
-          ? (local.config?.sessionSeed  || remote.config?.sessionSeed)
-          : (remote.config?.sessionSeed || local.config?.sessionSeed),
-        backendUrl:   local.config?.backendUrl || remote.config?.backendUrl,
-      };
-    })(),
-    deletedIds:          [...allDel],
+    transactions:         mergedTxs,
+    deudas:               mergedDeudas,
+    home:                 mergedHome,
+    config: {
+      // remote-wins: config administrada por admin, compartida entre todos los dispositivos
+      ...remote.config,
+      globalCats:    remote.config?.globalCats    || local.config?.globalCats,
+      homeCurr:      remote.config?.homeCurr      || local.config?.homeCurr,
+      users:         remote.config?.users          || local.config?.users,
+      budgets:       remote.config?.budgets        || local.config?.budgets,
+      savingsGoals:  remote.config?.savingsGoals  || local.config?.savingsGoals,
+      timezone:      remote.config?.timezone      || local.config?.timezone,
+      forceReloadTs: Math.max(remote.config?.forceReloadTs||0, local.config?.forceReloadTs||0),
+      urlVersion:    Math.max(lUrlV, rUrlV),
+      // merged: lógica específica
+      customMenus:   mergedMenus,
+      navOrder:      mergedNavOrder,
+      // local-wins: preferencias por dispositivo
+      hiddenNavItems: local.config?.hiddenNavItems ?? remote.config?.hiddenNavItems ?? [],
+      dashCardOrder:  (local.config?.dashCardOrder?.length ? local.config.dashCardOrder : null)
+                      ?? remote.config?.dashCardOrder ?? [],
+      // sessionSeed: local gana solo si este dispositivo tiene urlVersion más nueva (admin rotó)
+      sessionSeed: lUrlV >= rUrlV
+        ? (local.config?.sessionSeed  || remote.config?.sessionSeed)
+        : (remote.config?.sessionSeed || local.config?.sessionSeed),
+      backendUrl: local.config?.backendUrl || remote.config?.backendUrl,
+    },
+    deletedIds:           [...allDel],
     deletedCustomRecords: mergedDCRClean,
-    deletedMenuIds:      [...allDelMenus],
-    presence:     mergedPresence,
-    lastUpdated:  new Date().toISOString()
+    deletedMenuIds:       [...allDelMenus],
+    presence:             mergedPresence,
+    lastUpdated:          new Date().toISOString()
   };
 }
 
@@ -2744,58 +2776,37 @@ function applyRemoteData(data) {
   if (_pendingLocalChanges) return;
   if (_applyingRemote) return;
   _applyingRemote = true;
-  // Merge: tombstones locales bloquean ambos lados; updatedAt decide ganador en conflicto
-  const _safeMerge = (loc, rem) => {
-    const localDel = new Set(deletedIds);
-    const map = {};
-    (rem||[]).forEach(t => { if (!localDel.has(t.id)) map[t.id] = t; });
-    (loc||[]).forEach(t => {
-      if (localDel.has(t.id)) return;
-      const prev = map[t.id];
-      if (!prev || (t.updatedAt || '') >= (prev.updatedAt || '')) map[t.id] = t;
-    });
-    return Object.values(map);
-  };
-  if (Array.isArray(data.transactions)) txs = _safeMerge(txs, data.transactions);
-  if (Array.isArray(data.deudas)) deudas = _safeMerge(deudas, data.deudas);
-  if (Array.isArray(data.home)) homeTxs = _safeMerge(homeTxs, data.home);
+
+  // Tombstones locales protegen registros locales — no se usan tombstones remotos aquí
+  const localDel = new Set(deletedIds);
+  if (Array.isArray(data.transactions)) txs     = _mergeRecords(txs,     data.transactions, localDel);
+  if (Array.isArray(data.deudas))       deudas  = _mergeRecords(deudas,  data.deudas,       localDel);
+  if (Array.isArray(data.home))         homeTxs = _mergeRecords(homeTxs, data.home,         localDel);
+
   if (data.config) {
     const c = data.config;
+    // remote-wins: config compartida administrada por admin
     if (c.globalCats) { globalCats = c.globalCats; rebuildLegacyCatMaps(); }
-    if (c.homeCurr) HOME_CURR = c.homeCurr;
+    if (c.homeCurr)   HOME_CURR = c.homeCurr;
+    if (c.budgets)    budgets = c.budgets;
+    if (c.savingsGoals) { savingsGoals = c.savingsGoals; if (savingsGoals.length) _nextGoalId = Math.max(...savingsGoals.map(g=>g.id))+1; }
+    if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
+    // navOrder: remote base + local-only keys al final
     if (c.navOrder && Array.isArray(c.navOrder)) {
       const remoteNavSet = new Set(c.navOrder);
       navOrder = [...c.navOrder, ...navOrder.filter(k => !remoteNavSet.has(k))];
     }
-    if (c.hiddenNavItems) hiddenNavItems = c.hiddenNavItems;
+    // local-wins: preferencias por dispositivo (no sobreescribir con estado remoto)
+    // hiddenNavItems: no se aplica desde poll — el dispositivo mantiene su propia preferencia
     if (data.deletedMenuIds) {
       deletedMenuIds = [...new Set([...deletedMenuIds, ...data.deletedMenuIds])];
     }
     if (c.customMenus) {
-      const allDel = new Set(deletedIds);
       const allDelMenus = new Set(deletedMenuIds);
-      const remoteMenuIds = new Set(c.customMenus.map(m => m.id));
-      const incomingDCR = data.deletedCustomRecords || {};
-      customMenus = [
-        ...c.customMenus.filter(rm => !allDelMenus.has(rm.id)).map(rm => {
-          const lm = customMenus.find(x => x.id === rm.id);
-          if (!lm) return rm; // menú nuevo en Drive — tomar completo
-          // Tombstones locales bloquean ambos lados; updatedAt decide ganador en conflicto
-          const localMenuDel = new Set(deletedCustomRecords[rm.id] || []);
-          const mergeMenuData = (loc, rem) => {
-            const map = {};
-            (rem||[]).forEach(t => { if (!localMenuDel.has(t.id)) map[t.id] = t; });
-            (loc||[]).forEach(t => {
-              if (localMenuDel.has(t.id)) return;
-              const prev = map[t.id];
-              if (!prev || (t.updatedAt || '') >= (prev.updatedAt || '')) map[t.id] = t;
-            });
-            return Object.values(map);
-          };
-          return { ...rm, nextDataId: Math.max(lm.nextDataId||0, rm.nextDataId||0), data: mergeMenuData(lm.data || [], rm.data || []) };
-        }),
-        ...customMenus.filter(m => !remoteMenuIds.has(m.id) && !allDel.has(m.id) && !allDelMenus.has(m.id))
-      ];
+      // DCR local como Sets para pasarlos al helper
+      const localDCRSets = {};
+      Object.entries(deletedCustomRecords).forEach(([k, ids]) => { localDCRSets[k] = new Set(ids); });
+      customMenus = _mergeCustomMenusList(customMenus, c.customMenus, allDelMenus, localDCRSets);
       buildCustomMenuViews();
       // Restaurar vista activa — buildCustomMenuViews destruye el DOM de custom views
       const activeEl = document.getElementById(currentView);
@@ -2805,12 +2816,9 @@ function applyRemoteData(data) {
         renderCustomMenuView(parseInt(currentView.replace('view-custom-', '')));
       }
     }
-    if (c.budgets) budgets = c.budgets;
-    if (c.savingsGoals) { savingsGoals = c.savingsGoals; if (savingsGoals.length) _nextGoalId = Math.max(...savingsGoals.map(g=>g.id))+1; }
-   if (c.dashCardOrder && c.dashCardOrder.length) dashCardOrder = c.dashCardOrder;
-if (c.menuVisibility) {
-  localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
-}
+    if (c.menuVisibility) {
+      localStorage.setItem('cashmap_menu_visibility', JSON.stringify(c.menuVisibility));
+    }
     if (c.urlVersion != null) urlVersion = c.urlVersion;
     if (c.backendUrl && c.backendUrl !== getApiUrl()) {
       localStorage.setItem('cashmap_api_url', c.backendUrl);
