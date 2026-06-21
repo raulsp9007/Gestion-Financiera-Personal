@@ -4,7 +4,7 @@
  * Coloca este archivo en la misma carpeta que index.html
  */
 
-const CACHE_NAME = 'cashmap-v1.56';
+const CACHE_NAME = 'cashmap-v1.57';
 const APP_SHELL  = [
   './',
   './index.html',

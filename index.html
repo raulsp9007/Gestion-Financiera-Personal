@@ -6363,23 +6363,36 @@ function processRecurringAuto() {
   const today = new Date().toISOString().split('T')[0];
   let changed = false;
 
+  // Dedup helper: evita insertar clon si ya existe uno igual (mismo día+descripción+monto+tipo,
+  // excluyendo el template). Previene duplicados por race condition multi-dispositivo.
+  const _dupExists = (arr, templateId, date, desc, amount, type) =>
+    arr.some(x => x.id !== templateId && x.date === date && x.description === desc && x.amount === amount && x.type === type);
+
+  const _now = new Date().toISOString();
+
   // txs principales
   txs.filter(t => t.recurring && t.recurringNext).forEach(t => {
     while (t.recurringNext && t.recurringNext <= today) {
-      const {recurringNext, ...base} = t;
-      txs.push({...base, id: nextId++, date: recurringNext});
+      const recurringNext = t.recurringNext;
+      if (!_dupExists(txs, t.id, recurringNext, t.description, t.amount, t.type)) {
+        const {recurringNext: _rn, ...base} = t;
+        txs.push({...base, id: nextId++, date: recurringNext, updatedAt: _now});
+        changed = true;
+      }
       t.recurringNext = nextOccurrence(recurringNext, t.recurring);
-      changed = true;
     }
   });
 
   // homeTxs
   homeTxs.filter(t => t.recurring && t.recurringNext).forEach(t => {
     while (t.recurringNext && t.recurringNext <= today) {
-      const {recurringNext, ...base} = t;
-      homeTxs.push({...base, id: nextHomeId++, date: recurringNext});
+      const recurringNext = t.recurringNext;
+      if (!_dupExists(homeTxs, t.id, recurringNext, t.description, t.amount, t.type)) {
+        const {recurringNext: _rn, ...base} = t;
+        homeTxs.push({...base, id: nextHomeId++, date: recurringNext, updatedAt: _now});
+        changed = true;
+      }
       t.recurringNext = nextOccurrence(recurringNext, t.recurring);
-      changed = true;
     }
   });
 
@@ -6388,11 +6401,14 @@ function processRecurringAuto() {
     if (!m.data) return;
     m.data.filter(t => t.recurring && t.recurringNext).forEach(t => {
       while (t.recurringNext && t.recurringNext <= today) {
-        const {recurringNext, ...base} = t;
-        if (!m.nextDataId) m.nextDataId = (m.data.reduce((mx,x)=>Math.max(mx,x.id),0) + 1);
-        m.data.push({...base, id: m.nextDataId++, date: recurringNext});
+        const recurringNext = t.recurringNext;
+        if (!_dupExists(m.data, t.id, recurringNext, t.description, t.amount, t.type)) {
+          const {recurringNext: _rn, ...base} = t;
+          if (!m.nextDataId) m.nextDataId = (m.data.reduce((mx,x)=>Math.max(mx,x.id),0) + 1);
+          m.data.push({...base, id: m.nextDataId++, date: recurringNext, updatedAt: _now});
+          changed = true;
+        }
         t.recurringNext = nextOccurrence(recurringNext, t.recurring);
-        changed = true;
       }
     });
   });
