@@ -2483,6 +2483,11 @@ function initFromDrive(data) {
     });
   }
   _saveTombstones();
+  // Evitar que los contadores de ID colisionen con tombstones — causaría que el nuevo registro sea filtrado
+  const _initDelSet = new Set(deletedIds);
+  while (_initDelSet.has(nextId)) nextId++;
+  while (_initDelSet.has(nextHomeId)) nextHomeId++;
+  while (_initDelSet.has(nextDeudaId)) nextDeudaId++;
   if (data && data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
   if (data && data.lastUpdated) lastUpdatedStr = data.lastUpdated;
   // Señal de recarga forzada por admin
@@ -3563,6 +3568,8 @@ function saveTx() {
       if (recurring) txs[idx].recurringNext = recurringNext;
     }
   } else {
+    const _txDelSet = new Set(deletedIds);
+    while (_txDelSet.has(nextId)) nextId++;
     const tx = {id:nextId++,date,amount,description:desc,type,category:cat,notes,recurring,attachments:[..._modalAttachments],updatedAt:new Date().toISOString()};
     if (recurring) tx.recurringNext = recurringNext;
     txs.push(tx);
@@ -3918,6 +3925,8 @@ function saveHomeTx() {
       else delete homeTxs[idx].recurringNext;
     }
   } else {
+    const _homeDelSet = new Set(deletedIds);
+    while (_homeDelSet.has(nextHomeId)) nextHomeId++;
     const tx = { id:nextHomeId++, date, amount, description:desc, type, category:cat, notes, recurring, attachments:[..._modalAttachments], updatedAt:new Date().toISOString() };
     if (recurring) tx.recurringNext = recurringNext;
     homeTxs.push(tx);
@@ -4085,6 +4094,8 @@ function saveDeuda() {
       deudas[idx] = { ...deudas[idx], date, amount, persona, description: desc, type, status, notes, currency, updatedAt:new Date().toISOString() };
     }
   } else {
+    const _deudaDelSet = new Set(deletedIds);
+    while (_deudaDelSet.has(nextDeudaId)) nextDeudaId++;
     deudas.push({ id: nextDeudaId++, date, amount, persona, description: desc, type, status, notes, currency, paid: 0, payments: [], updatedAt:new Date().toISOString() });
   }
 
