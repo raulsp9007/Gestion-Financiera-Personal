@@ -2316,6 +2316,8 @@ function getApiUrl() {
 // Clave para cache offline en localStorage
 const CACHE_KEY  = 'cashmap_data_v1';
 const CACHE_TS_KEY = 'cashmap_data_ts';
+// Tombstones — persistidos siempre (incluso en modo cloud) para sobrevivir recargas y race conditions
+const TOMBSTONE_KEY = 'cashmap_tombstones_v1';
 
 let deferredInstallPrompt = null;
 let pendingOfflineChanges = false;
@@ -2324,6 +2326,23 @@ let _pendingLocalChanges = false;
 let deletedIds = []; // tombstone txs/deudas/home (IDs globales)
 let deletedCustomRecords = {}; // tombstone records de menús custom: {menuId: [recordId, ...]}
 let deletedMenuIds = []; // tombstone menús custom eliminados (IDs de menú)
+
+function _saveTombstones() {
+  try { localStorage.setItem(TOMBSTONE_KEY, JSON.stringify({ deletedIds, deletedCustomRecords, deletedMenuIds })); } catch(e) {}
+}
+function _loadTombstones() {
+  try {
+    const raw = localStorage.getItem(TOMBSTONE_KEY);
+    if (!raw) return;
+    const t = JSON.parse(raw);
+    if (Array.isArray(t.deletedIds)) deletedIds = [...new Set([...deletedIds, ...t.deletedIds])];
+    if (t.deletedCustomRecords) Object.entries(t.deletedCustomRecords).forEach(([mid, ids]) => {
+      if (!deletedCustomRecords[mid]) deletedCustomRecords[mid] = [];
+      deletedCustomRecords[mid] = [...new Set([...deletedCustomRecords[mid], ...ids])];
+    });
+    if (Array.isArray(t.deletedMenuIds)) deletedMenuIds = [...new Set([...deletedMenuIds, ...t.deletedMenuIds])];
+  } catch(e) {}
+}
 let onlinePresence = {}; // { userId: { id, name, role, lastSeen } }
 let _applyingRemote = false;
 let _renderPending = false;
@@ -2403,9 +2422,14 @@ function initFromDrive(data) {
     if (c.homeCurr) HOME_CURR = c.homeCurr;
     rebuildLegacyCatMaps();
     if (c.users && c.users.length)        { users = c.users; nextUserId = Math.max(...users.map(u=>u.id))+1; }
+    // Cargar tombstones de menú ANTES de customMenus para poder filtrar en el mismo paso
+    if (data && data.deletedMenuIds) {
+      deletedMenuIds = [...new Set([...deletedMenuIds, ...data.deletedMenuIds])];
+    }
     if (c.customMenus && c.customMenus.length) {
-      customMenus = c.customMenus;
-      nextMenuId = Math.max(...customMenus.map(m=>m.id))+1;
+      const _delMenuSet = new Set(deletedMenuIds);
+      customMenus = c.customMenus.filter(m => !_delMenuSet.has(m.id));
+      if (customMenus.length) nextMenuId = Math.max(...customMenus.map(m=>m.id))+1;
       // Auto-sanar nextDataId: debe superar tanto el ID más alto en data como los tombstones
       const _incomingTombs = (data && data.deletedCustomRecords) || {};
       customMenus.forEach(m => {
@@ -2447,9 +2471,7 @@ function initFromDrive(data) {
     const safeDel = data.deletedIds.filter(id => !liveLoaded.has(id));
     deletedIds = [...new Set([...deletedIds, ...safeDel])];
   }
-  if (data && data.deletedMenuIds) {
-    deletedMenuIds = [...new Set([...deletedMenuIds, ...data.deletedMenuIds])];
-  }
+  // deletedMenuIds ya cargado antes de customMenus (arriba) — no repetir
   if (data && data.deletedCustomRecords) {
     Object.entries(data.deletedCustomRecords).forEach(([mid, ids]) => {
       if (!deletedCustomRecords[mid]) deletedCustomRecords[mid] = [];
@@ -2460,6 +2482,7 @@ function initFromDrive(data) {
       deletedCustomRecords[mid] = [...new Set([...deletedCustomRecords[mid], ...safeIds])];
     });
   }
+  _saveTombstones();
   if (data && data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
   if (data && data.lastUpdated) lastUpdatedStr = data.lastUpdated;
   // Señal de recarga forzada por admin
@@ -2818,6 +2841,7 @@ if (c.menuVisibility) {
       deletedCustomRecords[mid] = [...new Set([...deletedCustomRecords[mid], ...safeIds])];
     });
   }
+  _saveTombstones();
   if (data.presence) { onlinePresence = data.presence; renderPresenceWidget(); }
   if (data.lastUpdated) lastUpdatedStr = data.lastUpdated;
   if (!(inAppsScript || getApiUrl())) {
@@ -2946,6 +2970,9 @@ window.onload = function() {
     setSyncBadge('local');
     initAuth();
   }
+
+  // Cargar tombstones persistidos antes de cualquier dato (sobreviven recargas y race conditions)
+  _loadTombstones();
 
   // Show skeleton while loading
   document.body.classList.add('loading-data');
@@ -5522,6 +5549,7 @@ function deleteCustomMenu(id) {
   deletedMenuIds = [...new Set([...deletedMenuIds, id])];
   customMenus = customMenus.filter(m=>m.id!==id);
   delete customCharts[id];
+  _saveTombstones();
   renderMenusList();
   buildCustomMenuViews();
   renderNavForUser();
